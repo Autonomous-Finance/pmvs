@@ -2,7 +2,9 @@
 
 **Status:** pre-EIP review draft. **Author:** Ivan Morozov (Zeit Finance). **First published:** 2026-08-18. No EIP or ERC number has been assigned, and no official discussion thread has been opened.
 
-PMVS specifies an ERC-20 vault that holds prediction-market shares. PMVS calls the market shares **outcome positions** and the investor token the **vault share**. Each vault share is a fungible, pro-rata unit of declared net asset value (NAV). The share token remains the same while the strategy trades, merges, and redeems outcome positions.
+PMVS specifies a prediction-market vault. It issues fungible ERC-20 **vault shares** to investors and holds prediction-market **outcome positions** inside a declared custody perimeter. Each vault share is a pro-rata unit of declared net asset value (NAV). It remains the same token while the portfolio changes.
+
+The reference architecture keeps these two token layers in different contracts. A per-vault Strategy Safe holds working collateral and Gnosis Conditional Tokens Framework (CTF) positions. The share-vault contract controls the ERC-20 supply and temporarily buffers pUSD during settlement. It does not hold the outcome positions.
 
 The standard covers the whole vault: share accounting, custody, valuation, asynchronous entry and exit, fees, settlement, migration, and closure. Signed records and on-chain commitments make the relevant state and arithmetic checkable.
 
@@ -12,12 +14,14 @@ Core v1 targets Ethereum and EVM chains. Versioned profiles define venue, storag
 
 The portfolio and the investor use different tokens:
 
-| Layer | Holder | Meaning | Lifetime |
-|---|---|---|---|
-| Outcome position | Vault custody | A claim on one prediction-market result | Leaves the portfolio through sale, merge, or redemption |
-| ERC-20 vault share | Investor | A pro-rata unit of declared vault NAV | Continues while the portfolio changes |
+| Layer | Standard or protocol | Holder | Meaning | Lifetime |
+|---|---|---|---|---|
+| Outcome position | Gnosis CTF on ERC-1155 in the reference profile | Declared strategy custody | A claim on one prediction-market result | Leaves the portfolio through sale, merge, or redemption |
+| Vault share | ERC-20 | Investor | A pro-rata unit of declared vault NAV | Continues while the portfolio changes |
 
-Outcome positions are often ERC-1155 tokens, but a venue profile may define another form. The ERC-20 contract is the vault-share component. It may hold only a temporary accounting-asset buffer while a strategy wallet holds the outcome positions.
+CTF defines condition, collection, and position ids. It also defines how collateral is split into positions, how complete sets merge back into collateral, and how resolved positions redeem. ERC-1155 defines balances, transfers, batch operations, and operator approvals. PMVS defines the vault that holds these positions and issues one ERC-20 share over their combined NAV. A different venue can select another versioned position profile.
+
+Venue interfaces may call the same CTF asset an outcome share or outcome token. PMVS uses one normative term: outcome position. Current Polymarket Combo positions are also ERC-1155 tokens, but they use a separate Positions Framework and an RFQ venue. They are not CTF positions and are outside `venue/polymarket/1`.
 
 The custody perimeter includes every account whose cash, outcome positions, receivables, claim reserves, or liabilities belong to the vault. Valuation includes the full perimeter. Moving an asset between declared custody accounts does not change NAV.
 
@@ -25,7 +29,7 @@ The custody perimeter includes every account whose cash, outcome positions, rece
 
 Each outcome position is tied to one market and one payout condition. The vault sells, merges, or redeems it before moving capital into another market. A managed strategy rotates through many such positions. Direct ownership would force each investor and integration to track changing ERC-1155 ids, market resolutions, and venue actions.
 
-The ERC-20 vault share gives the strategy one continuing funding unit. Investors subscribe and redeem in the accounting asset. Wallets, governance systems, and other protocols integrate one token while the vault changes its portfolio.
+An individual outcome position is designed to settle and be redeemed when one market resolves. It is therefore a poor long-term fundraising token. The ERC-20 vault share gives the strategy one continuing funding unit. Investors subscribe and redeem in the accounting asset. The strategy can redeploy capital across markets while wallets, governance systems, and other protocols continue to use the same token.
 
 ERC-20 defines balances, transfers, and allowances. It does not define the share's assets, NAV, entry price, exit price, fees, or recovery path. A prediction-market vault must answer:
 
@@ -38,9 +42,22 @@ ERC-20 defines balances, transfers, and allowances. It does not define the share
 
 Demand, liquidity, and legal rights remain deployment-specific. Before accepting capital, a deployment must disclose its custody controls, request delays, fees, transfer restrictions, loss paths, and redemption rules.
 
-## Reference architecture
+## Reference implementation and Boring Vault lineage
 
-PMVS extends the modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds): a small share vault delegates strategy actions to a Manager, asset movement and share issuance to a Teller, and price publication to an Accountant. Prediction-market vaults add:
+PMVS does not require a Boring Vault interface or claim compatibility with one. Boring Vault is a contract architecture, not an ERC. The reference implementation adapts its separation of share issuance, accounting, and privileged asset movement for prediction markets, but the contracts are not interchangeable.
+
+The contract named `BoringVault` in the reference implementation is a purpose-built share-vault component. It is not a fork of, or API-compatible with, the current [Veda BoringVault](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/src/base/BoringVault.sol).
+
+| Question | Veda BoringVault | Reference `BoringVault` |
+|---|---|---|
+| What does the contract custody? | Strategy assets in the vault contract; it accepts ERC-721 and ERC-1155 transfers | Its declared custody role is the configured ERC-20 settlement buffer; the Strategy Safe holds CTF positions |
+| How are privileged actions expressed? | Authorized arbitrary `manage` calls plus `enter` and `exit` | Fixed `mintShares`, `burnShares`, `distributeAsset`, and `vaultToStrategy` functions |
+| How is access controlled? | Solmate `Auth` and an external authority | Explicit owner, manager, and Teller caller checks, plus a configured strategy destination |
+| Does PMVS require this interface? | No | No; PMVS specifies roles and economic invariants |
+
+The reference share-vault has no ERC-1155 receiver hooks and no arbitrary-call `manage` function. A CTF safe transfer or mint to that contract would revert. The Strategy Safe is the outcome-position custodian.
+
+The prediction-market reference suite adds:
 
 1. a declared custody perimeter for outcome positions and trading collateral;
 2. venue-aware inventory and valuation;
@@ -53,14 +70,16 @@ The reference contracts map to those roles as follows:
 
 | Reference module | PMVS role |
 |---|---|
-| `BoringVault` | ERC-20 share token and temporary accounting-asset buffer; only the Teller can mint or burn shares |
+| `BoringVault` | 18-decimal ERC-20 share with EIP-2612 permit and a temporary pUSD buffer; only the Teller can mint or burn shares |
 | `Teller` | Aggregate deposit and redemption transfers plus share mint and burn operations |
 | `Accountant` | Gross and final epoch price per share plus the high-water mark |
 | `FeeManager` | Performance-fee calculation and manager fee accrual |
 | `EscrowAdapter` | Deposit and redemption queues, epoch control, aggregate settlement, Merkle commitments, and claims |
-| Strategy custody account | Working collateral and ERC-1155 outcome positions used by the strategy |
+| Strategy Safe | Working collateral and CTF ERC-1155 outcome positions used by the strategy |
 
-An implementation may combine or rename modules. Conformance depends on the declared roles, interfaces, and invariants.
+The reference `BoringVault.manager` name must not be used to infer PMVS authority. That Solidity role, together with the owner, can send the temporary buffer to the configured strategy address. It does not direct prediction-market trades. PMVS calls the authority that directs position operations the strategy manager. Component records declare each power instead of mapping roles by name.
+
+An implementation may combine or rename modules. Conformance depends on the declared powers, interfaces, custody perimeter, and invariants.
 
 ```text
 investor
@@ -132,7 +151,9 @@ The first two results can expose inconsistent accounting. They cannot prove that
 PMVS builds on existing Ethereum standards:
 
 - [ERC-20](https://eips.ethereum.org/EIPS/eip-20) defines the fungible investor share.
-- [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155) commonly represents the outcome positions in custody. The [Conditional Tokens reference contracts](https://github.com/gnosis/conditional-tokens-contracts) use ERC-1155 positions that can be split, merged, and redeemed after resolution.
+- [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155) defines the multi-token interface used by the reference outcome positions.
+- The [Gnosis Conditional Tokens Framework](https://github.com/gnosis/conditional-tokens-contracts/blob/master/docs/developer-guide.rst) defines the condition, position-id, split, merge, resolution, and redemption rules used by Polymarket outcome tokens. Polymarket calls CTF an open standard. CTF has no EIP or ERC number, so PMVS binds it as the application protocol `position/gnosis-ctf/1` above ERC-1155.
+- Polymarket's [Positions Framework](https://docs.polymarket.com/trading/positions/combinatorial) issues separate ERC-1155 Combo positions through `PositionManager`. Combo positions are not CTF positions and need their own PMVS position, venue, and valuation profiles.
 - [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) defines tokenized-vault accounting for one ERC-20 asset and synchronous entry and exit. A deployment claims ERC-4626 only when it implements the complete interface and semantics.
 - [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540) adds pending, claimable, and claimed states for asynchronous vault requests. New PMVS request profiles should use it when their behavior satisfies the full standard.
 - [ERC-7575](https://eips.ethereum.org/EIPS/eip-7575) permits an external share token and multiple entry points. Its separation between the durable share and replaceable entry components fits the PMVS subject model.
@@ -148,6 +169,9 @@ PMVS conformance does not imply conformance to ERC-4626, ERC-7540, or ERC-7575. 
 | [`pmvs-core.md`](./pmvs-core.md) | Vault model, subject identity, components, records, authorities, anchoring, and conformance |
 | [`pmvs-settlement.md`](./pmvs-settlement.md) | Asynchronous requests, epoch settlement, pricing, fees, claims, funding, and retirement |
 | [`pmvs-m1.md`](./pmvs-m1.md) | Outcome-position inventory, venue capture, valuation, illiquidity, NAV, and deterministic replay |
+| [`profiles/position-gnosis-ctf-1.md`](./profiles/position-gnosis-ctf-1.md) | Gnosis CTF position identity, ERC-1155 balances, lifecycle, and profile boundaries |
+| [`schemas/position-gnosis-ctf-1.schema.json`](./schemas/position-gnosis-ctf-1.schema.json) | Closed machine shape for the CTF `position` subobject |
+| [`fixtures/position-gnosis-ctf-1.json`](./fixtures/position-gnosis-ctf-1.json) | Gnosis CTF condition, collection, position, and payout vector |
 | [`profiles/anchor-evm-1.md`](./profiles/anchor-evm-1.md) | EVM registry and atomic anchor behavior |
 | [`profiles/venue-polymarket-1.md`](./profiles/venue-polymarket-1.md) | Polymarket contracts, inventory, books, resolution, fees, and degraded modes |
 | [`profiles/storage-arweave-1.md`](./profiles/storage-arweave-1.md) | Arweave upload, read-back, repair, bundling, and retention assumptions |

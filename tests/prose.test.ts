@@ -37,14 +37,36 @@ describe("proposal prose", () => {
 
     const readme = await Bun.file("README.md").text();
     expect(readme).toContain("# PMVS: Prediction Market Vault Standard");
-    expect(readme).toContain("PMVS specifies an ERC-20 vault that holds prediction-market shares");
+    expect(readme).toContain("PMVS specifies a prediction-market vault");
     expect(readme).toContain(
-      "PMVS calls the market shares **outcome positions** and the investor token the **vault share**",
+      "It issues fungible ERC-20 **vault shares** to investors and holds prediction-market **outcome positions**",
     );
-    expect(readme).toContain("Each vault share is a fungible, pro-rata unit of declared net asset value");
+    expect(readme).toContain("A per-vault Strategy Safe holds working collateral and Gnosis Conditional Tokens Framework");
+    expect(readme).toContain("It does not hold the outcome positions");
+    expect(readme).toContain("position/gnosis-ctf/1");
+    expect(readme).toContain("Each vault share is a pro-rata unit of declared net asset value");
     expect(readme).toContain("The custody perimeter includes every account whose cash");
     expect(readme).toContain("ERC-20 defines balances, transfers, and allowances");
-    expect(readme).toContain("Boring Vault architecture");
+    expect(readme).toContain("PMVS does not require a Boring Vault interface");
+    expect(readme).toContain("is not a fork of, or API-compatible with");
+    expect(readme).toContain("The reference share-vault has no ERC-1155 receiver hooks");
+    expect(readme).toContain("Current Polymarket Combo positions are also ERC-1155 tokens");
+    expect(readme).not.toContain("PMVS extends the modular");
+
+    const ctfProfile = await Bun.file("profiles/position-gnosis-ctf-1.md").text();
+    expect(ctfProfile).toContain("abi.encodePacked(address oracle, bytes32 questionId, uint256 outcomeSlotCount)");
+    expect(ctfProfile).toContain("CTHelpers.getCollectionId(parentCollectionId, conditionId, indexSet)");
+    expect(ctfProfile).toContain("abi.encodePacked(address collateralToken, bytes32 collectionId)");
+    expect(ctfProfile).toContain("without filtering by emitting contract");
+
+    const m1 = await Bun.file("pmvs-m1.md").text();
+    expect(m1).toContain("Do not restrict the query by emitting contract");
+    expect(m1).toContain("The venue profile's contract list classifies candidates; it does not limit discovery");
+
+    const polymarketProfile = await Bun.file("profiles/venue-polymarket-1.md").text();
+    expect(polymarketProfile).toContain("This profile does not cover Polymarket Combo positions");
+    expect(polymarketProfile).toContain("UNSUPPORTED_POSITION_FORMAT");
+    expect(polymarketProfile).toContain("A PositionManager `setApprovalForAll` approval does not prove");
   });
 
   test("resolves every relative Markdown link", async () => {

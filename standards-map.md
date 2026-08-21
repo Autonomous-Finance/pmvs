@@ -1,16 +1,18 @@
 # Standards map
 
-PMVS specifies an ERC-20 vault that holds prediction-market outcome positions. The positions may change without replacing the vault share. PMVS defines the custody, NAV, asynchronous settlement, and lifecycle rules behind that share. Existing ERCs define the token and common vault interfaces.
+PMVS specifies a prediction-market vault with ERC-20 investor shares and changing outcome positions inside a declared custody perimeter. The reference positions already have a protocol: Gnosis Conditional Tokens Framework (CTF), implemented through ERC-1155 tokens. PMVS defines the share, custody, NAV, asynchronous settlement, and lifecycle around that portfolio.
 
 This map favors Final standards with deployed, composable interfaces. Draft and Review proposals appear only as related work. Statuses were checked on 2026-08-21 and must be checked again before publication. An idea does not become a PMVS dependency until its interface and status are stable enough for that role.
 
 ## Design boundaries
 
-| Standard | What it provides | PMVS use | What PMVS must not claim |
+| Standard or protocol | What it provides | PMVS use | What PMVS must not claim |
 |---|---|---|---|
 | [ERC-20](https://eips.ethereum.org/EIPS/eip-20) | Fungible balances, transfers, allowances, and events | The investor's durable vault share | ERC-20 alone does not define NAV, redemption, backing, or settlement safety. |
 | [ERC-165](https://eips.ethereum.org/EIPS/eip-165) | Interface detection | Detects optional vault and settlement interfaces | A successful call or matching function name is not interface detection. |
-| [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155) | Many token types in one contract | Event-specific outcome positions held by custody | An outcome token is not the same economic object as a vault share. |
+| [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155) | Balances, transfers, batch operations, events, and operator approvals for many token ids | The token interface beneath reference outcome positions | ERC-1155 does not define a market condition, payout, split, merge, or redemption. |
+| [Gnosis CTF](https://github.com/gnosis/conditional-tokens-contracts/blob/master/docs/developer-guide.rst) | Condition, collection, and position ids plus split, merge, resolution, and redemption | `position/gnosis-ctf/1`, used by the Polymarket venue profile | CTF is an application protocol, not an ERC. One CTF outcome position is not a share of the whole vault. |
+| [Polymarket Positions Framework](https://docs.polymarket.com/trading/positions/combinatorial) | ERC-1155 YES and NO tokens for combinatorial positions under `PositionManager` | Known incompatible position family; excluded from `venue/polymarket/1` | Combo positions are not CTF positions, and their RFQ execution cannot use the CLOB cross mark. |
 | [ERC-2612](https://eips.ethereum.org/EIPS/eip-2612) | Signed ERC-20 approvals | Optional share-token convenience | PMVS does not require permit, and permit does not authorize settlement records. |
 | [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) | A tokenized-vault interface for one accounting asset | Optional interface for a fully conforming implementation | `totalAssets()` must not revert, and PMVS records do not excuse any method, preview, limit, or rounding rule. |
 | [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540) | Pending, claimable, and claimed states for asynchronous vault requests | Preferred request model for new settlement profiles | The standard builds on ERC-7575. A custom epoch ABI is not ERC-7540 merely because both systems use requests. |
@@ -21,6 +23,10 @@ This map favors Final standards with deployed, composable interfaces. Draft and 
 | [ERC-8330](https://eips.ethereum.org/EIPS/eip-8330) | Provider-attributed NAV streams, corrections, staleness, and optional aggregation | Possible adapter target for PMVS valuation outputs | It is in Review and does not calculate or verify NAV. PMVS does not depend on it. |
 
 ## Lessons applied from final ERCs
+
+### Reuse the outcome-position protocol
+
+PMVS does not create another prediction-market token. The `position/gnosis-ctf/1` profile binds the existing CTF position model. PMVS begins where CTF stops: one ERC-20 share over the NAV of many changing outcome positions.
 
 ### Keep the base small
 
@@ -58,7 +64,9 @@ ERC-8330 is close to the PMVS valuation layer, but the scopes differ. ERC-8330 s
 
 ## Reference architecture
 
-The [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small vault from its Manager, Teller, and Accountant. PMVS uses that role split and adds an outcome-position custody perimeter, venue-aware NAV, asynchronous request settlement, claim funding, and retirement rules.
+The reference implementation adapts the role separation of the [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds). Boring Vault is not an Ethereum standard or a PMVS dependency. The reference contract named `BoringVault` is also not API-compatible with the [current Veda source](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/src/base/BoringVault.sol).
+
+The custody difference is material. Veda's contract can receive ERC-1155 assets and lets authorized callers execute `manage`, `enter`, and `exit`. The prediction-market reference share-vault has no ERC-1155 receiver hook or arbitrary-call function. It holds a temporary ERC-20 accounting-asset buffer, while a separate Strategy Safe holds the CTF positions. PMVS covers either layout only when the component record declares the actual custody accounts and powers.
 
 An implementation may use any contract suite if it declares every component and satisfies the PMVS requirements.
 

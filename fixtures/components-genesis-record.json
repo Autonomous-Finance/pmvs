@@ -19,7 +19,7 @@
   "share": {
     "decimals": "18",
     "economicUnit": "pro-rata-nav",
-    "permit": false,
+    "permit": true,
     "pausable": false,
     "allowList": false,
     "transferFee": false,
@@ -29,15 +29,15 @@
   },
   "accountingAsset": {
     "chainId": "137",
-    "address": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+    "address": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
     "decimals": "6",
-    "unit": "usdc.e-base-unit"
+    "unit": "pusd-base-unit"
   },
   "portfolio": {
     "kind": "prediction-market",
     "custodyModel": "external-strategy",
     "positionFormats": [
-      "erc1155"
+      "position/gnosis-ctf/1"
     ],
     "entryAssetMode": "accounting-asset",
     "exitAssetMode": "accounting-asset"
@@ -45,6 +45,11 @@
   "interfaces": [
     {
       "id": "erc20",
+      "supported": true,
+      "contract": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624"
+    },
+    {
+      "id": "erc2612",
       "supported": true,
       "contract": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624"
     }
@@ -95,7 +100,7 @@
       "role": "strategy-custody",
       "chainId": "137",
       "address": "0x0000000000000000000000000000000000000005",
-      "accountType": "eoa",
+      "accountType": "contract",
       "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
       "proxy": null
     },

@@ -2,6 +2,8 @@
 
 [`pmvs-envelope-v1.schema.json`](./pmvs-envelope-v1.schema.json) is the machine-readable base shape for the ten v1 record kinds and their envelope. It uses JSON Schema 2020-12 and closes each record at the top level. The component record also fixes the vault's share semantics, prediction-market portfolio type, custody model, position formats, accounting asset, interfaces, and active modules.
 
+[`position-gnosis-ctf-1.schema.json`](./position-gnosis-ctf-1.schema.json) closes the `position` subobject selected by `position/gnosis-ctf/1`. The venue profile owns the surrounding inventory entry and must supply its closed schema before release. Numeric range and cross-field derivation checks still run in the profile verifier.
+
 The base schema leaves these profile-owned objects open: publication grace by record kind, profile parameters, migration evidence, methodology parameters, venue positions and books, venue correlation fields, transaction events, observed asset balances, wind-down gates, residual-asset lines, and watcher books. The named profile supplies their closed shape and meaning. A verifier that lacks that profile schema returns `UNSUPPORTED_PROFILE`; passing only the base schema is not record conformance.
 
 JSON Schema is only the first check. A conforming verifier must also:

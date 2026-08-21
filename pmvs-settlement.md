@@ -47,7 +47,7 @@ The epoch-Merkle profile follows the component split in Part I:
 | Strategy manager | Raises accounting assets from the position portfolio and controls transfers to or from strategy custody |
 | Request adapter | Escrows requests, freezes epochs, commits allocations, funds claims, and verifies claim proofs |
 
-This profile adds asynchronous request states and Merkle claims to the modular Boring Vault roles. Strategy custody sells or redeems positions when the vault needs accounting assets for withdrawals. Exiting investors receive the accounting asset under the settled price and rounding rules. Outcome positions remain outside the share-vault contract in declared vault custody.
+This profile maps asynchronous requests and Merkle claims to the component roles in Part I. It does not require a Boring Vault interface. Strategy custody sells or redeems positions when the vault needs accounting assets for withdrawals. Exiting investors receive the accounting asset under the settled price and rounding rules. Outcome positions remain outside the share-vault contract in declared vault custody.
 
 ## Required settlement lifecycle
 

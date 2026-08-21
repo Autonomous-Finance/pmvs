@@ -4,7 +4,9 @@ import { describe, expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { privateKeyToAccount } from "viem/accounts";
 import componentRecord from "../fixtures/components-genesis-record.json";
+import ctfPositionRecord from "../fixtures/position-gnosis-ctf-1.json";
 import envelopeSchema from "../schemas/pmvs-envelope-v1.schema.json";
+import ctfPositionSchema from "../schemas/position-gnosis-ctf-1.schema.json";
 import {
   PMVS_MERKLE_TAG,
   ZERO_HASH,
@@ -14,6 +16,9 @@ import {
   canonicalize,
   compatibilityLeaf,
   compatibilityRoot,
+  ctfConditionId,
+  ctfPositionId,
+  ctfRedemptionPayout,
   netPps,
   performanceFeeShares,
   pmvsMerkleLeaf,
@@ -63,7 +68,14 @@ describe("PMVS-JCS/1", () => {
 describe("machine schema", () => {
   test("accepts the signed component-genesis fixture", async () => {
     const hash = recordHash(componentRecord);
-    expect(hash).toBe("0x7286a7285e98763ab158993d6f27a7f349b6b47f12b31b76aba9215884aef014");
+    expect(hash).toBe("0x64f5e66b3c18b0c1705bfeeb433e820ebbe8f45b28cf262ff82b94cf8e2f065c");
+    expect(componentRecord.portfolio.positionFormats).toEqual(["position/gnosis-ctf/1"]);
+    expect(componentRecord.accountingAsset.address).toBe("0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb");
+    expect(componentRecord.accountingAsset.unit).toBe("pusd-base-unit");
+    expect(componentRecord.share.permit).toBe(true);
+    expect(componentRecord.interfaces.some((claim) => claim.id === "erc2612" && claim.supported)).toBe(
+      true,
+    );
     const account = privateKeyToAccount(`0x${"1".padStart(64, "0")}`);
     const signature = await account.signTypedData({
       domain: {
@@ -95,7 +107,7 @@ describe("machine schema", () => {
       },
     });
     expect(signature).toBe(
-      "0xbe78c672d973341d973978a75e3e4da3283d43f28fd1d9e2672171f17fbe6be8009de37ab0fd22c7ddd070713a05d5ca2366287ff558db582bbf7495d47a07551b",
+      "0xacf2fa373b413e561209505ceebc5cd108b5d8d53c74abede44669d65d65b69a5e1bf6329304e5395ce97e2ef8e754858bd6a084b6f9b09ec3a4285972c326b81b",
     );
     const envelope = {
       record: componentRecord,
@@ -122,6 +134,32 @@ describe("machine schema", () => {
         record: { ...componentRecord, portfolio: { ...componentRecord.portfolio, kind: "generic-vault" } },
       }),
     ).toBe(false);
+    expect(
+      validate({
+        ...envelope,
+        record: { ...componentRecord, portfolio: { ...componentRecord.portfolio, positionFormats: ["erc1155"] } },
+      }),
+    ).toBe(false);
+    for (const invalidPositionFormat of [
+      "position/gnosis-ctf/0",
+      "position/Gnosis-ctf/1",
+      "position/gnosis_ctf/1",
+      "position/-gnosis-ctf/1",
+      "position/gnosis--ctf/1",
+      "position/gnosis-ctf-/1",
+      "position/gnosis-ctf/01",
+      "position/gnosis-ctf/1/extra",
+    ]) {
+      expect(
+        validate({
+          ...envelope,
+          record: {
+            ...componentRecord,
+            portfolio: { ...componentRecord.portfolio, positionFormats: [invalidPositionFormat] },
+          },
+        }),
+      ).toBe(false);
+    }
     expect(
       validate({
         ...envelope,
@@ -234,6 +272,64 @@ describe("machine schema", () => {
       record: { ...record, outputs: { ...record.outputs, perPosition: [incompletePosition] } },
     };
     expect(validate(incomplete)).toBe(false);
+  });
+});
+
+describe("Gnosis CTF position profile", () => {
+  test("matches the published condition, collection, position, and payout vector", () => {
+    const validate = new Ajv2020({ strict: true, allErrors: true }).compile(ctfPositionSchema);
+    expect(validate(ctfPositionRecord), JSON.stringify(validate.errors)).toBe(true);
+
+    expect(
+      ctfConditionId(
+        ctfPositionRecord.oracle as `0x${string}`,
+        ctfPositionRecord.questionId as `0x${string}`,
+        BigInt(ctfPositionRecord.outcomeSlotCount),
+      ),
+    ).toBe(ctfPositionRecord.conditionId);
+    expect(
+      ctfPositionId(
+        ctfPositionRecord.collateralToken as `0x${string}`,
+        ctfPositionRecord.collectionId as `0x${string}`,
+      ),
+    ).toBe(BigInt(ctfPositionRecord.positionId));
+    expect(
+      ctfRedemptionPayout(
+        BigInt(ctfPositionRecord.quantity),
+        BigInt(ctfPositionRecord.indexSet),
+        [0n, 1n, 0n],
+        1n,
+      ),
+    ).toBe(1_000_000n);
+
+    const maxSlotPayouts = Array<bigint>(256).fill(0n);
+    maxSlotPayouts[255] = 1n;
+    expect(ctfRedemptionPayout(7n, 1n << 255n, maxSlotPayouts, 1n)).toBe(7n);
+  });
+
+  test("rejects malformed profile fields and invalid payout inputs", () => {
+    const validate = new Ajv2020({ strict: true, allErrors: true }).compile(ctfPositionSchema);
+    for (const outcomeSlotCount of ["1", "03", "257"]) {
+      expect(validate({ ...ctfPositionRecord, outcomeSlotCount })).toBe(false);
+    }
+    expect(validate({ ...ctfPositionRecord, quantity: "0" })).toBe(false);
+    expect(
+      validate({
+        ...ctfPositionRecord,
+        custodyAccount: "0x0000000000000000000000000000000000000000",
+      }),
+    ).toBe(false);
+    expect(validate({ ...ctfPositionRecord, undeclared: "field" })).toBe(false);
+    expect(() =>
+      ctfConditionId(
+        ctfPositionRecord.oracle as `0x${string}`,
+        ctfPositionRecord.questionId as `0x${string}`,
+        1n,
+      ),
+    ).toThrow();
+    expect(() => ctfRedemptionPayout(1n, 0n, [0n, 1n], 1n)).toThrow();
+    expect(() => ctfRedemptionPayout(1n, 3n, [0n, 1n], 1n)).toThrow();
+    expect(() => ctfRedemptionPayout(1n, 1n, [0n, 1n], 2n)).toThrow();
   });
 });
 

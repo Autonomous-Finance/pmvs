@@ -63,6 +63,53 @@ export function subjectId(chainId: bigint, shareToken: Address): Hex {
   return keccak256(encodePacked(["uint256", "address"], [chainId, shareToken]));
 }
 
+export function ctfConditionId(
+  oracle: Address,
+  questionId: Hex,
+  outcomeSlotCount: bigint,
+): Hex {
+  if (outcomeSlotCount < 2n || outcomeSlotCount > 256n) {
+    throw new Error("outcome slot count must be in [2, 256]");
+  }
+  return keccak256(
+    encodePacked(["address", "bytes32", "uint256"], [oracle, questionId, outcomeSlotCount]),
+  );
+}
+
+export function ctfPositionId(collateralToken: Address, collectionId: Hex): bigint {
+  return BigInt(keccak256(encodePacked(["address", "bytes32"], [collateralToken, collectionId])));
+}
+
+export function ctfRedemptionPayout(
+  quantity: bigint,
+  indexSet: bigint,
+  payoutNumerators: readonly bigint[],
+  payoutDenominator: bigint,
+): bigint {
+  if (quantity < 0n) throw new Error("quantity must be non-negative");
+  if (payoutNumerators.length < 2 || payoutNumerators.length > 256) {
+    throw new Error("payout vector length must be in [2, 256]");
+  }
+  if (payoutDenominator <= 0n) throw new Error("payout denominator must be positive");
+  if (payoutNumerators.some((value) => value < 0n)) {
+    throw new Error("payout numerator must be non-negative");
+  }
+  if (payoutNumerators.reduce((sum, value) => sum + value, 0n) !== payoutDenominator) {
+    throw new Error("payout numerators must sum to the denominator");
+  }
+
+  const fullIndexSet = (1n << BigInt(payoutNumerators.length)) - 1n;
+  if (indexSet <= 0n || indexSet >= fullIndexSet) {
+    throw new Error("index set must be a nonempty proper subset");
+  }
+
+  let positionPayoutNumerator = 0n;
+  for (let i = 0; i < payoutNumerators.length; i += 1) {
+    if ((indexSet & (1n << BigInt(i))) !== 0n) positionPayoutNumerator += payoutNumerators[i];
+  }
+  return (quantity * positionPayoutNumerator) / payoutDenominator;
+}
+
 export type CompatibilityLeafInput = {
   requestId: bigint;
   owner: Address;

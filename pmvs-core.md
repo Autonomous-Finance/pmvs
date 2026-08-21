@@ -13,7 +13,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Abstract
 
-PMVS specifies an ERC-20 vault that holds prediction-market shares. PMVS calls the market shares **outcome positions** and the investor token the **vault share**. Each vault share is a fungible, pro-rata unit of declared net asset value (NAV). The share token remains the same while the strategy trades, merges, and redeems outcome positions.
+PMVS specifies a prediction-market vault. It issues fungible ERC-20 **vault shares** to investors and holds prediction-market **outcome positions** inside a declared custody perimeter. Each vault share is a pro-rata unit of declared net asset value (NAV). It remains the same token while the portfolio changes.
+
+In the reference architecture, a per-vault Strategy Safe holds working collateral and Gnosis Conditional Tokens Framework (CTF) ERC-1155 positions. The share-vault contract controls the ERC-20 supply and temporarily buffers the accounting asset during settlement. It does not hold the outcome positions.
 
 The `(chainId, shareToken)` pair identifies the vault. This Part defines its accounting asset, custody perimeter, component roles, lifecycle, and minimum holder protections. It also defines the records and on-chain commitments required to reproduce settlement calculations and compare recorded chain inputs with pinned Ethereum state.
 
@@ -23,7 +25,9 @@ Version 1 can verify signed records, chain state, and deterministic arithmetic. 
 
 ## Motivation
 
-An outcome position is tied to one market and one payout condition. The vault sells, merges, or redeems it before moving capital into another market. A managed strategy holds many positions and enters new markets. Direct ownership would force investors to track changing ERC-1155 ids, resolution states, and venue operations.
+The existing CTF protocol defines how collateral becomes outcome positions and how those positions merge or redeem. PMVS starts above that layer. It defines how a vault holds, values, and settles a portfolio of positions while investors hold one ERC-20 vault share.
+
+An outcome position is tied to one market and one payout condition. It is designed to settle and be redeemed when that market resolves, so it is a poor long-term fundraising token. The vault sells, merges, or redeems it before moving capital into another market. A managed strategy holds many positions and enters new markets. Direct ownership would force investors to track changing ERC-1155 ids, resolution states, and venue operations.
 
 The ERC-20 vault share is a continuing funding unit. Investors enter and exit in one accounting asset while the vault keeps the changing portfolio in custody. Wallets and protocols integrate the share without integrating each outcome position.
 
@@ -31,7 +35,7 @@ ERC-20 defines token balances and transfers. It leaves custody, NAV, entry and e
 
 The operator may control both venue-data capture and settlement submission. Canonical records bind its inputs and calculations to the resulting vault state.
 
-The modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small share vault from a Manager, Teller, and Accountant. PMVS keeps that split and adds strategy custody, outcome-position inventory, venue-aware valuation, asynchronous settlement, and terminal-state rules.
+The reference implementation adapts Boring Vault's separation of share issuance, accounting, and asset movement. PMVS itself neither requires nor extends Boring Vault. The reference share-vault is a custom contract, not an upstream BoringVault fork or compatible interface.
 
 ## Scope
 
@@ -101,22 +105,27 @@ strategy manager
 
 An external strategy wallet may hold the outcome positions while the share vault holds only an accounting-asset buffer. The component record places that wallet inside the custody perimeter, and each valuation includes its balances.
 
+Component roles describe powers, not Solidity names. A contract field named `manager` is not a PMVS strategy manager unless its declared permissions include directing position operations. A Boring Vault role name also does not establish compatibility with an upstream BoringVault interface.
+
 ## Minimum vault invariants
 
 Every conforming subject satisfies these rules:
 
 1. The share token implements ERC-20 and represents fungible, proportional units of one declared vault NAV. It does not encode one market, condition, or outcome.
 2. The active component generation declares one accounting asset and its decimals. Deposits, redemptions, NAV, price per share, and fees use that unit unless a named profile defines an exact conversion.
-3. Every outcome position, cash balance, receivable, claim reserve, and liability in the vault perimeter appears in valuation or in a declared exclusion with a reason.
-4. A supply increase corresponds to an accepted deposit, a declared fee mint, migration, or another profile-defined event. A supply decrease corresponds to an accepted redemption, migration, or declared burn.
-5. A deposit cannot receive shares from a valuation that omits existing holder assets. A redemption cannot receive assets from a valuation that omits liabilities or unfunded claims.
-6. A request has explicit pending, claimable or selected, claimed, cancelled, and failed behavior. The active settlement profile states every transition and who can trigger it.
-7. Migration preserves every outstanding share, pending request, funded claim, and recovery right. Terminal closure leaves no unexplained share supply or residual asset.
-8. ERC-4626, ERC-7540, and ERC-7575 support are separate interface claims. PMVS conformance does not excuse an incomplete implementation of another standard.
+3. Every outcome position follows a declared position profile that defines its identity, balance source, and payout state.
+4. Every outcome position, cash balance, receivable, claim reserve, and liability in the vault perimeter appears in valuation or in a declared exclusion with a reason.
+5. A supply increase corresponds to an accepted deposit, a declared fee mint, migration, or another profile-defined event. A supply decrease corresponds to an accepted redemption, migration, or declared burn.
+6. A deposit cannot receive shares from a valuation that omits existing holder assets. A redemption cannot receive assets from a valuation that omits liabilities or unfunded claims.
+7. A request has explicit pending, claimable or selected, claimed, cancelled, and failed behavior. The active settlement profile states every transition and who can trigger it.
+8. Migration preserves every outstanding share, pending request, funded claim, and recovery right. Terminal closure leaves no unexplained share supply or residual asset.
+9. ERC-4626, ERC-7540, and ERC-7575 support are separate interface claims. PMVS conformance does not excuse an incomplete implementation of another standard.
 
 ## Definitions
 
-- **Outcome position**: a claim tied to one market outcome. It may be an ERC-1155 token, another token type, or an entry in venue custody. It is an asset of the vault, not the PMVS share.
+- **Outcome position**: a claim tied to one market outcome. A venue may call it an outcome share or outcome token. It may be a CTF ERC-1155 token, another token type, or an entry in venue custody. It is an asset of the vault, not the PMVS share.
+- **Conditional Tokens Framework (CTF)**: the Gnosis protocol that defines collateral-backed conditions, outcome collections, positions, splitting, merging, resolution, and redemption. Its positions implement ERC-1155. CTF is not an ERC.
+- **Positions Framework**: Polymarket's separate protocol for combinatorial positions. Its PositionManager issues ERC-1155 tokens, but those tokens are not CTF positions.
 - **Prediction-market vault**: the share token, components, custody accounts, assets, liabilities, authorities, and lifecycle rules that form one PMVS subject.
 - **Subject**: the economic vault identified by `(chainId, shareToken)`. An adapter or entry contract is not the subject because it may change while the share remains in circulation.
 - **Custody perimeter**: every address and venue account whose balances, positions, receivables, reserves, or liabilities belong to the subject.
@@ -159,7 +168,7 @@ A verifier MUST NOT infer one axis from another. Feature presence, such as cance
 2. `subjectId` is defined as `keccak256(abi.encodePacked(uint256 chainId, address shareToken))`. Test vector: `chainId = 137`, `shareToken = 0x4aff8269a587643f68aa8e58c5ad93d9423e8624` gives `subjectId = 0x119eba4ba90359458811e719965925e255c3537b907914b6428f775c8d297892`.
 3. The share token MUST implement ERC-20. Each unit denotes the same proportional NAV interest as every other unit of that token, subject only to declared fees and transfer restrictions. It MUST NOT represent a specific outcome position.
 4. The first component record MUST state `shareDecimals` and `economicUnit: "pro-rata-nav"`. It MUST also state whether transfers can be paused, blocked, taxed, rebased, allow-listed, or changed by an administrator. A false capability statement is a component mismatch. EIP-2612, ERC-4626, ERC-7540, and ERC-7575 support are separate, testable claims. PMVS conformance alone implies none of them.
-5. The component record MUST contain a `portfolio` object. It declares `kind: "prediction-market"`, the custody model, the supported position formats, and whether entry and exit use the accounting asset or a named profile conversion.
+5. The component record MUST contain a `portfolio` object. It declares `kind: "prediction-market"`, the custody model, the supported position-profile ids, and whether entry and exit use the accounting asset or a named profile conversion.
 6. Each subject MUST directly anchor a `components` record as its subject-stream genesis before claiming conformance. Every later component generation MUST also be directly anchored before a changed component or policy governs a covered action.
 7. A component record MUST contain the subject, `subjectId`, generation number, previous component-record hash, accounting asset and decimals, share terms, portfolio declaration, interface support, settlement profile, valuation method, venue profile, storage profile, chain confirmation depth, publication windows, and every behavior-selecting parameter used by those profiles.
 8. It MUST list each contract or account that can hold subject assets, mint or burn shares, accept requests, settle requests, set valuation, charge fees, anchor records, or move custody. Each entry contains its role, chain id, address, runtime-code hash, and proxy implementation data when applicable. An EOA component uses the zero code hash and is labeled `eoa`. Venue accounts that have no EVM address use the account form defined by the venue profile.
@@ -177,13 +186,17 @@ The component record's `portfolio` object has these fields:
 |---|---|
 | `kind` | MUST be `prediction-market` in Core v1 |
 | `custodyModel` | `direct` when the share vault holds all positions, `external-strategy` when declared strategy accounts hold them, or `hybrid` when both do |
-| `positionFormats` | Nonempty list of token standards or versioned venue-ledger profiles used by the portfolio, such as `erc1155` |
+| `positionFormats` | Nonempty list of versioned position-profile ids used by the portfolio, such as `position/gnosis-ctf/1` |
 | `entryAssetMode` | `accounting-asset` or `profile-defined` |
 | `exitAssetMode` | `accounting-asset` or `profile-defined` |
 
 `economicUnit: "pro-rata-nav"` is an accounting definition. It means that each fungible share uses the same NAV and price-per-share basis within its component generation. It does not create a legal ownership claim beyond the rights supplied by the deployment.
 
+Each `positionFormats` entry uses `position/<protocol>/<positive-version>`, where `protocol` is a lowercase ASCII slug. Entries sort in ascending UTF-16 code-unit order. The selected profile defines position identity, balances, transfer events, lifecycle state, and payout reads. ERC-1155 alone is a token interface and is not a complete prediction-market position profile.
+
 An `external-strategy` or `hybrid` subject MUST list every strategy-custody account under its venue profile and in the component record or its closed profile parameters. Part III reconstructs inventory across all of them. A custody-model or position-format change creates a new component generation before the new configuration receives or moves subject assets.
+
+Earlier pre-release fixtures used the raw label `erc1155` in `positionFormats`. That label does not identify prediction-market semantics and is invalid under this draft. An unanchored fixture using it must be regenerated. If such bytes were anchored, the deployment publishes a new component generation and keeps the old record. Published bytes are never silently rewritten. After a schema release, changing the accepted identifier form requires a new schema version.
 
 ## PMVS-JCS/1: canonical serialization
 
@@ -348,6 +361,7 @@ A verifier returns every applicable code. `VALID` is returned only when no other
 | `INVALID_SIGNATURE` | Attestation fails: bad signature, wrong scheme, or signer not the authority at anchor time. |
 | `UNVERIFIABLE_AUTHORITY` | The historical authority or ERC-1271 result was not resolved by the declared on-chain mechanism. The record cannot pass integrity verification. |
 | `UNSUPPORTED_PROFILE` | A behavior-selecting field names a profile, schema, or methodology the verifier does not implement. |
+| `UNSUPPORTED_POSITION_FORMAT` | A custody account holds a nonzero position whose versioned position profile is not active for the component generation. |
 | `ARITHMETIC_MISMATCH` | Deterministic re-execution of record inputs does not reproduce record outputs. |
 | `CHAIN_STATE_MISMATCH` | A recorded chain read does not match archive-node state at the pinned block. |
 | `SETTLEMENT_MISMATCH` | Archive contents are inconsistent with on-chain roots, totals, selections, or events (Part II). |
@@ -372,7 +386,7 @@ A code's effect depends on the requested verification scope:
 
 1. `INVALID_*`, `UNVERIFIABLE_AUTHORITY`, `ARITHMETIC_MISMATCH`, `CHAIN_STATE_MISMATCH`, `SETTLEMENT_MISMATCH`, `UNDERFUNDED_CLAIMS`, `STRANDED_SHARE_SUPPLY`, `UNALLOCATED_ASSETS`, `EQUIVOCATION`, `CHAIN_BROKEN`, `MISSING_RECORD`, and `UNSUPPORTED_PROFILE` prevent a passing result for every scope that requires the affected record.
 2. `UNANCHORED` or `STALE` prevents a level claim when that level requires the record to be anchored or timely.
-3. `INCOMPLETE_CAPTURE`, `INCOMPLETE_INVENTORY`, `UNVERIFIABLE_INVENTORY`, `UNVERIFIABLE_INPUTS`, and `DATA_UNAVAILABLE` prevent the affected record from serving as a required L2 valuation. A `gap` record may report `DATA_UNAVAILABLE` and still fill an L3 cadence slot, subject to the declared maximum run of gaps.
+3. `INCOMPLETE_CAPTURE`, `INCOMPLETE_INVENTORY`, `UNVERIFIABLE_INVENTORY`, `UNVERIFIABLE_INPUTS`, `DATA_UNAVAILABLE`, and `UNSUPPORTED_POSITION_FORMAT` prevent the affected record from serving as a required L2 valuation. `UNSUPPORTED_POSITION_FORMAT` also blocks new valuation-dependent settlement until the position leaves the custody perimeter under a declared policy or an active profile covers it. A `gap` record may report `DATA_UNAVAILABLE` and still fill an L3 cadence slot, subject to the declared maximum run of gaps.
 4. `UNEXECUTED_ANCHOR` cannot satisfy a requirement for an executed settlement. It does not by itself make a later, separately anchored settlement invalid.
 5. `INCONCLUSIVE` and `FIDELITY_SUSPECT` qualify T3 evidence. They do not change T1 or T2 results.
 

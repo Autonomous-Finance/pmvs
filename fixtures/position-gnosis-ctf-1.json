@@ -1,0 +1,16 @@
+{
+  "profile": "position/gnosis-ctf/1",
+  "chainId": "1",
+  "positionContract": "0x0000000000000000000000000000000000000011",
+  "custodyAccount": "0x0000000000000000000000000000000000000022",
+  "collateralToken": "0xd011ad011ad011ad011ad011ad011ad011ad011a",
+  "oracle": "0x1337abcdef1337abcdef1337abcdef1337abcdef",
+  "questionId": "0xabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc1234",
+  "outcomeSlotCount": "3",
+  "conditionId": "0x67eb23e8932765c1d7a094838c928476df8c50d1d3898f278ef1fb2a62afab63",
+  "parentCollectionId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "indexSet": "3",
+  "collectionId": "0x229b067e142fce0aea84afb935095c6ecbea8647b8a013e795cc0ced3210a3d5",
+  "positionId": "37693898053274048404593502359659239753240614604124988648569102175355156051639",
+  "quantity": "1000000"
+}

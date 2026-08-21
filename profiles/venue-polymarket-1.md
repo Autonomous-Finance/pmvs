@@ -7,12 +7,20 @@ version:        1 (draft)
 status:         Pre-EIP review draft
 author:         Ivan Morozov (Zeit Finance)
 created:        2026-08-18
-requires:       PMVS Parts I through III
+requires:       PMVS Parts I through III; position/gnosis-ctf/1
 ```
 
 Venue facts can change while the PMVS core remains stable. This draft was checked against Polymarket's primary documentation on 2026-08-21. Once this profile is released, a material contract, API, collateral, or fee change creates a new profile id. Old records keep this one.
 
 A venue profile must supply the three capabilities Parts II and III consume: observable inventory (position tokens whose balances are on-chain readable), an executable bid surface (a displayed order book to cross), and a resolution signal (an on-chain finality and payout source). Venues without a limit-order book (AMM or RFQ venues) cannot reuse this profile's cross mark; they need their own profile defining the settlement-bearing mark.
+
+## Outcome-position protocol
+
+This profile covers Polymarket CTF positions traded through the CLOB. It covers standard binary markets and negative-risk binary markets. Under this profile, `portfolio.positionFormats` MUST equal `["position/gnosis-ctf/1"]`. The CTF position id is the ERC-1155 token id used in balances, transfers, approvals, CLOB orders, and redemption.
+
+Standard and negative-risk markets use the same `ConditionalTokens` contract. Their exchange and conversion paths differ. Each supported position is binary, uses the UMA Adapter below as its oracle, sets `outcomeSlotCount = 2`, has a zero `parentCollectionId`, and uses `indexSet = 1` or `indexSet = 2`. Current positions use pUSD as collateral. A position with another oracle or a nonzero legacy-collateral position requires a profile that states its exact resolution, redemption, and accounting-asset conversion route.
+
+This profile does not cover Polymarket Combo positions. Combo YES and NO tokens are ERC-1155 tokens issued by a separate `PositionManager` under the Positions Framework. They are not CTF positions. Combo execution uses an RFQ flow, not the CLOB book used by PMVS-M1 here. Supporting Combo positions therefore requires a separate position profile and a venue profile with a settlement-bearing RFQ valuation rule.
 
 ## Chain and contracts (Polygon PoS, chainId 137)
 
@@ -28,6 +36,16 @@ A venue profile must supply the three capabilities Parts II and III consume: obs
 | Collateral offramp (venue dollar to USDC.e) | `0x2957922eb93258b93368531d39facca3b4dc5854` |
 | CTF Collateral Adapter | `0xada100db00ca00073811820692005400218fce1f` |
 | Neg-risk CTF Collateral Adapter | `0xada2005600dec949baf300f4c6120000bdb6eaab` |
+| UMA Adapter, CTF condition oracle | `0x6a9d222616c90fca5754cd1333cfd9b7fb6a4f74` |
+| Gnosis Safe Factory, reference custody factory | `0xaacfeea03eb1561c4e67d661e40682bd20e3541b` |
+| Positions Framework PositionManager proxy, exclusion sentinel | `0x006f54f7f9a22e0000cc2ab60031000000ae9fef` |
+| PositionManager implementation (observed 2026-08-21) | `0x30c038f0dae8dcc3e6ad51d016f50821d32cb87e` |
+| Combo Exchange proxy, outside this profile | `0xe3333700ca9d93003f00f0f71f8515005f6c00aa` |
+| Combo Exchange implementation (observed 2026-08-21) | `0x7345c6842b244926125ed4054905cac49620b5dc` |
+| AutoRedeemer proxy, approval sentinel | `0xa1200000d0002264c9a1698e001292d00e1b00af` |
+| AutoRedeemer implementation (observed 2026-08-21) | `0x64860bfd14fccaac09cd36f347784a9616afb66c` |
+
+Rows marked as outside, exclusion, or approval sentinels define an explicit boundary. Listing them does not activate Combo support. Capture pins proxy implementations and runtime-code hashes rather than trusting this dated table.
 
 The collateral registry contains two 6-decimal tokens: pUSD at the proxy above and USDC.e at `0x2791bca1f2de4661ed88a30c99a7a9449aa84174`. Polymarket documents pUSD as a USDC claim and supplies amount-preserving wrap and unwrap calls. The pinned pUSD source also exposes role-gated minting and owner-authorized upgrades. PMVS therefore does not treat the documentation alone as proof of current redeemability.
 
@@ -41,14 +59,24 @@ Under this profile, converting pUSD amounts to USDC.e at 1:1 is an explicit risk
 
 A failed read, pause, role mismatch, code change, authority change, or reserve shortfall blocks fresh settlement under this profile. It does not turn pUSD or a pUSD-denominated position into zero. The record lists pUSD and USDC.e balances separately. These checks prove state at one block only. They do not guarantee that the backing or ramp stays available until a later payout, so records state this residual collateral risk.
 
-Custody pattern: a per-vault venue-relayed Safe-style wallet holds positions and venue collateral. Its address is on-chain discoverable, and it is the account the inventory rules of Part III reconstruct. Position token ids are CTF position ids (`uint256`); neg-risk wrapped positions resolve to CTF ids for balance purposes.
+Custody pattern: a per-vault venue-relayed Strategy Safe holds positions and venue collateral. The component record names the Safe as a contract account and pins its runtime code. The share-vault contract is not the position holder. Position token ids are CTF `uint256` ids.
 
 ## Inventory (Part III bindings)
 
-- Transfer-log reconstruction runs over the CTF contract (`TransferSingle` and `TransferBatch`) from each custody account's proved checkpoint. Another ERC-1155 contract is included only when a later profile revision lists its address and balance method.
+- Transfer-log reconstruction runs over the CTF contract (`TransferSingle` and `TransferBatch`) from each custody account's proved checkpoint.
 - Quantities come from `balanceOfBatch` on the CTF at the pinned valuation block. Venue Data-API sizes are `venueReportedSize` metadata only.
-- Each position entry records `collateralToken`, `parentCollectionId`, `conditionId`, and `indexSet`. The verifier recomputes the CTF collection id and position id and requires the result to equal the book's `asset_id`. This binds its payout asset and outcome index to the held ERC-1155 id.
+- Each venue position entry contains a `position` object that passes `position/gnosis-ctf/1`, including its `oracle`, `questionId`, and `outcomeSlotCount` fields. The surrounding venue entry names the CLOB asset and exchange route. The verifier requires the binary and root-position constraints above, applies the CTF derivations, and requires `position.positionId` to equal the book's `asset_id`. This binds the order book to the held ERC-1155 position and its payout asset.
 - The Data API (`https://data-api.polymarket.com/positions`) applies server-side size filters. Because API sizes are non-normative this only affects metadata completeness, and capture MUST NOT apply any API-side filter to the normative set.
+
+### Combo exclusion sentinel
+
+1. Reconstruct the PositionManager token-id set for every custody account from its `TransferSingle` and `TransferBatch` logs.
+2. Read every candidate id with PositionManager `balanceOfBatch` at the same pinned block as the CTF inventory.
+3. Any nonzero PositionManager balance produces `UNSUPPORTED_POSITION_FORMAT`. It blocks valuation-dependent settlement under this profile. No dust exception applies.
+4. A PositionManager `setApprovalForAll` approval does not prove that the Safe owns a Combo token. Record it as a custody power, but trigger the unsupported-position result only for a nonzero balance.
+5. Pin all CTF and PositionManager operator approvals. At the ERC-1155 layer, an approved operator is authorized to move that token family. The record identifies the operator, its intended function, and the authority that can revoke it. This includes the CTF Exchange, Neg Risk CTF Exchange, Neg Risk Adapter, AutoRedeemer, and any other approved operator.
+
+The strict balance rule permits a liveness attack through an unsolicited ERC-1155 transfer. A deployment MUST declare an unsupported-token response before accepting deposits. It may return an unsolicited token to its nonzero recorded sender in a disclosed transaction, then start a new pinned capture. It MUST NOT discard a token acquired by the strategy, a token with disputed ownership, or a position with material rights. Such a token requires an active profile, holder-preserving recovery, or wind-down. Until then, fresh valuation-dependent settlement remains blocked. Existing cancellation and funded-claim paths remain available according to the active settlement profile.
 
 ## Book capture (the executable bid surface)
 
@@ -108,6 +136,9 @@ The venue is a single centralized service, so its unavailability is a first-clas
 ## Primary references
 
 - [Polymarket contract addresses](https://docs.polymarket.com/resources/contracts)
+- [How Polymarket CTF positions work](https://docs.polymarket.com/trading/positions/how-positions-work)
+- [Polymarket combinatorial positions and the separate Positions Framework](https://docs.polymarket.com/trading/positions/combinatorial)
+- [Polymarket Combo RFQ flow](https://docs.polymarket.com/trading/combos/overview)
 - [Order-book response](https://docs.polymarket.com/api-reference/market-data/get-order-book)
 - [pUSD wrapping and unwrapping](https://docs.polymarket.com/concepts/pusd)
 - [CollateralToken source at `ccc0596`](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/collateral/CollateralToken.sol)
