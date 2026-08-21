@@ -1,16 +1,20 @@
-# PMVS watcher profile: `watcher/0` (EXPERIMENTAL)
+# PMVS watcher profile: `watcher/0` (EXPERIMENTAL, NON-CONFORMING)
 
 ```
 pmvs-part:      profile (watcher)
 profile-id:     watcher/0
 version:        0 (experimental draft)
-status:         Experimental draft; alarm method unresolved
+status:         Experimental only; not a PMVS conformance profile
 author:         Ivan Morozov (Zeit Finance)
 created:        2026-08-18
 requires:       PMVS Parts I, III; a venue profile
 ```
 
-Watchers record their own venue observations near an operator's capture. The observation format is normative for this draft. Statistical alarms remain experimental. Watcher agreement does not authenticate a venue response, and common control can manufacture agreement.
+Watchers record their own venue observations near an operator's capture. Version 0 is a research sketch, not a conformance profile. Its sampling procedure and statistical alarms are provisional. Watcher agreement does not authenticate a venue response, and common control can manufacture agreement.
+
+Part I currently defines the `watcher-observation` kind but does not define record kinds for a sampling-seed commitment or a watcher gap. The base schema also lacks closed shapes for those records. Version 0 therefore cannot encode or verify the complete procedure described below.
+
+Version 0 contributes no evidence to a PMVS conformance claim and cannot support a `W(...)` claim. A deployment can publish these experimental records alongside an otherwise conforming subject, but verifiers exclude them from conformance. A later version can become a conformance profile only after it defines the missing record kinds, closed schemas, canonical fixtures, signature and sequencing vectors, and executable verification tests.
 
 ```
 operator record R ---- compare within the declared window
@@ -22,19 +26,19 @@ temporal bracket only: INCONCLUSIVE unless a named alarm method applies
 no eligible observation: INCONCLUSIVE
 ```
 
-## Observation records (normative)
+## Provisional observation records
 
-A watcher publishes a Part I envelope with `kind: "watcher-observation"`, `stream: "watcher"`, and `producer` equal to its signer. Its stream is keyed by `(subjectId, producer)`. The record contains observation time, request start and end, token-selection rule, sampling-window id, raw response hashes and locations, normalized ladders, and venue correlation fields. The watcher derives candidate tokens from the latest subject valuation and venue listing. It records that derivation and any sampled subset.
+A prototype watcher can publish a Part I envelope with `kind: "watcher-observation"`, `stream: "watcher"`, and `producer` equal to its signer. Its stream is keyed by `(subjectId, producer)`. The proposed record contains observation time, request start and end, token-selection rule, sampling-window id, raw response hashes and locations, normalized ladders, and venue correlation fields. The watcher derives candidate tokens from the latest subject valuation and venue listing, then records that derivation and any sampled subset. This selection is for book sampling only. It does not establish inventory completeness.
 
-Sampling MUST be time-randomized within declared windows. Before a window starts, the watcher anchors a commitment to the seed, window, selection rule, and expected sample count. It reveals the seed after the window. Every scheduled sample receives an observation or an explicit watcher gap. Omitting a failed or unfavorable sample reduces coverage. A W designation requires watcher anchors within the declared latency; signatures without timely anchors do not establish observation order.
+The proposed sampling method randomizes sample times within declared windows. Before a window starts, the watcher would anchor a commitment to the seed, window, selection rule, and expected sample count. It would reveal the seed after the window. Each scheduled sample would produce either an observation or an explicit watcher gap. Omitting a failed or unfavorable sample would reduce reported coverage. These steps are design requirements for a future profile, but version 0 cannot represent the seed commitment or watcher gap as PMVS records.
 
-## Corroboration (normative, weak claims only)
+## Experimental corroboration
 
-For an operator record R at capture time t and position i:
+For an operator record `R` at capture time `t` and position `i`:
 
-1. **Exact correlation match.** If an eligible watcher observation near time `t` carries a book `hash` byte-equal to the operator record for the same token, both captures report the same opaque venue correlation value. This is the clearest signal the profile produces. It does not prove the book was true or independently generated.
-2. **Temporal bracketing (heuristic).** Without an exact match, watcher observations bracketing t bound nothing formally, because a book can change arbitrarily between two observations. Bracket comparisons (crossing R's position size into the bracketing ladders and comparing marks) are heuristic evidence and MUST be labeled `INCONCLUSIVE` unless the experimental alarm methodology below is explicitly invoked, with its version named.
-3. No eligible observations means `INCONCLUSIVE`. Non-detection is never evidence of correctness: an unwatched or thinly watched subject has no T3 signal.
+1. **Exact correlation match.** If an eligible watcher observation near time `t` carries a book `hash` byte-equal to the operator record for the same token, both captures report the same opaque venue correlation value. This is correlation evidence only. It does not prove the book was true or independently generated.
+2. **Temporal bracketing.** Without an exact match, watcher observations bracketing `t` set no formal bound because a book can change arbitrarily between observations. Comparing marks from the two ladders is a heuristic. A prototype reports that comparison as `INCONCLUSIVE` unless it also names and applies an experimental alarm method.
+3. With no eligible observation, a prototype reports `INCONCLUSIVE`. Non-detection is never evidence of correctness. An unwatched or thinly watched subject has no T3 evidence.
 
 ## Alarm methodology (EXPERIMENTAL, not a conformance surface)
 
@@ -49,11 +53,11 @@ A bias detector needs all of these declared inputs:
 - missing-data treatment; and
 - a NAV-weighted effect size, so a large deviation on a negligible position is not confused with a small deviation on a concentrated position.
 
-Version 0 fixes none of those choices. A deployment that experiments with alarms MUST publish the full parameter set with any `FIDELITY_SUSPECT` output. That output can prompt human investigation. It is never an automated conformance verdict.
+Version 0 fixes none of those choices. A prototype that experiments with alarms should publish the full parameter set with any `FIDELITY_SUSPECT` label. That label can prompt human investigation. It is not a PMVS verifier verdict or a conformance result under version 0.
 
 ## Independence and reporting
 
-A watcher under the operator's administration does not count as independent. `W(n, coverage, window, diversity)` reports eligible watchers, scheduled-sample coverage, the evaluation window, and an administrative and infrastructure-diversity statement. Sybil resistance here is organizational, not cryptographic. The report lists missed samples and common API, cloud, gateway, and key-control dependencies.
+A watcher under the operator's administration is not independent. An experimental report can state the number of eligible watchers, scheduled-sample coverage, evaluation window, and administrative and infrastructure dependencies. It should list missed samples and shared API, cloud, gateway, and key-control dependencies. This is descriptive research evidence, not a `W(...)` claim. Sybil resistance for watcher independence is organizational and operational, not cryptographic.
 
 ## Copyright
 

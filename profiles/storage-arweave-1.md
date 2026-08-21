@@ -14,27 +14,27 @@ This profile binds Part I's storage rules to Arweave. The protocol facts were ch
 
 ## What an Arweave transaction id is, and is not
 
-An Arweave L1 transaction id is `SHA-256(signature)`. The (randomized RSA-PSS) signature covers a deep-hash of the transaction fields, including `data_root`, the Merkle root of the data chunks. ANS-104 DataItem ids are analogous: `SHA-256` of a signature over the content. The consequences this profile draws:
+An Arweave L1 transaction id is `SHA-256(signature)`. The randomized RSA-PSS signature covers a deep-hash of the transaction fields, including `data_root`, the Merkle root of the data chunks. ANS-104 DataItem ids use the same outer construction: `SHA-256` of the DataItem signature. Therefore:
 
 ```
  recordHash = keccak256(bytes)      ◀── the PMVS commitment (EVM-checkable)
  ar://<txid>                        ◀── a locator only
       txid = SHA-256(signature(deepHash(fields incl. data_root)))
-      binds content two crypto hops deep, through Arweave-internal schemes
+      signature covers fields that include the data root
  same bytes re-uploaded ⇒ SAME recordHash, DIFFERENT txid
       ⇒ anchors commit the hash; locators are repairable
 ```
 
 1. A txid is not the Keccak-256 content hash that the EVM anchor stores. The PMVS commitment is always `recordHash = keccak256(bytes)`; the txid is a locator with its own Arweave verification path.
-2. Re-uploading identical bytes yields a different txid and the same `recordHash`, which is exactly why anchors commit the hash and treat locators as repairable (`ArtifactLocationAdded`, Part I).
-3. URIs in anchors and records use the gateway-agnostic form `ar://<txid>`. Gateway-specific URLs (`https://arweave.net/<txid>`) MAY appear only in the unhashed `locations`. Resolution MUST work by txid against arbitrary gateways.
+2. Re-uploading identical bytes yields a different txid and the same `recordHash`. Anchors therefore commit `recordHash` and treat locators as repairable (`ArtifactLocationAdded`, Part I).
+3. URIs in anchors and records use the gateway-agnostic form `ar://<txid>`. Gateway-specific URLs (`https://arweave.net/<txid>`) MAY appear only in the unhashed `locations`. A resolver MUST derive requests from the txid without depending on one fixed gateway.
 
 ## Upload lifecycle (all MUST)
 
 1. **Persist first.** The exact canonical bytes are durably stored operator-side before submission. The operator's retention duty (Part I) is independent of network behavior.
 2. **Submit and confirm.** Check the submission and status responses. Confirm the transaction at the declared `arweaveConfirmations` depth before it counts as published. For an ANS-104 item, confirm the parent transaction and verify the item's presence in the parent bytes.
 3. **Read back.** After confirmation, fetch the bytes by txid and verify `keccak256` equality with the submitted bytes.
-4. **Two read paths.** Retrievability (Part I) is demonstrated against at least two independent read paths: distinct gateways, or a gateway plus a direct node. A record retrievable from fewer is not yet "published" for grace purposes.
+4. **Two read paths.** Retrievability (Part I) is demonstrated against at least two operationally independent read paths: separately operated gateways, or a gateway plus a direct node. A record retrievable from fewer is not yet "published" for grace purposes.
 5. **Repair.** If the bytes become unretrievable (a dropped transaction, gateway loss), re-upload the identical bytes and register the new locator via `ArtifactLocationAdded`. The anchor never changes.
 
 ## Bundling (periodic records)
@@ -57,19 +57,19 @@ Tags are unauthenticated hints for GraphQL-style discovery. They are signed by t
 | `Epoch` | settlement records only |
 | `Content-Type` | `application/json` (records) / `application/octet-stream` (raw sidecars) |
 
-GraphQL indexing is non-canonical. Discovery falls back to anchors (events and the registry), which are authoritative for existence.
+GraphQL indexing is non-canonical. Discovery falls back to anchor events and registry state. Those sources establish that a commitment exists; the retrieved bytes still have to match `recordHash`.
 
 ## Identity
 
-The Arweave signing key (JWK) is pure transport. It authenticates nothing in PMVS, because attestation is the operator's EVM signature (Part I). Key rotation needs no ceremony, and compromise of the JWK alone cannot forge records; at most it publishes junk under the tags, which fails the hash and attestation checks.
+The Arweave signing key (JWK) authenticates only the storage transaction. It does not attest a PMVS record. Under Part I, the declared record authority signs the EIP-712 attestation with ECDSA or validates it through ERC-1271. A watcher signs its own watcher record as the declared producer. Rotating the JWK does not change a subject authority or watcher-producer identity. Compromise of the JWK alone can publish misleading discovery tags, but it cannot forge a valid PMVS attestation.
 
 ## Size and cost discipline
 
-Bid ladders and claim sets dominate record size, and their size varies widely. Deployments MUST track p50, p95, and p99 published-record sizes. Capture only the data that Parts II and III require: bids through fill or exhaustion, no ask side in the record, and the actual claim set. Price each upload against the live network fee endpoint at submission time. Static cost claims do not belong in records or conformance statements. If a record is too large for a practical transaction, split raw responses into content-addressed sidecars and bind each sidecar hash from the record.
+Bid ladders and claim sets dominate record size, and their size varies widely. Deployments MUST track the 50th, 95th, and 99th percentiles of published-record size. Capture only the data that Parts II and III require: bids through fill or exhaustion, no ask side in the record, and the actual claim set. Price each upload against the live network fee endpoint at submission time. Static cost claims do not belong in records or conformance statements. If a record is too large for a practical transaction, split raw responses into content-addressed sidecars. Bind each sidecar hash from the record.
 
 ## Retention assumptions (disclosure)
 
-Arweave uses an economic endowment model. Nodes and gateways may apply content policies, and the uploader must seed the data. PMVS treats the network as transport with a stated retention assumption, not as a trust anchor. If network copies disappear but the operator still has the canonical bytes, the operator can re-upload them under the same PMVS hash.
+Arweave uses an economic endowment model funded by the upload fee. Nodes and gateways may apply content policies. PMVS treats the network as transport with a stated retention assumption, not as a trust anchor. If network copies disappear but the operator still has the canonical bytes, the operator can re-upload them under the same PMVS hash.
 
 ## Primary references
 

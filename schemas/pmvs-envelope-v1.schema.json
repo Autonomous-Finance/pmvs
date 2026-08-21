@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://autonomous.finance/pmvs/schemas/pmvs-envelope-v1.schema.json",
+  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.1/schemas/pmvs-envelope-v1.schema.json",
   "title": "PMVS v1 record envelope",
   "type": "object",
   "required": ["record", "attestation", "locations"],
@@ -15,17 +15,71 @@
   },
   "additionalProperties": false,
   "$defs": {
-    "uint": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-    "sint": { "type": "string", "pattern": "^(0|-?[1-9][0-9]*)$" },
+    "uint": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 78,
+      "$comment": "uint256; a conforming verifier also rejects values greater than 2^256 - 1"
+    },
+    "positiveUint": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$",
+      "maxLength": 78,
+      "$comment": "positive uint256; a conforming verifier also rejects values greater than 2^256 - 1"
+    },
+    "uint8": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+    },
+    "uint64": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]|1844674407370955161[0-5])$"
+    },
+    "positiveUint64": {
+      "allOf": [
+        { "$ref": "#/$defs/uint64" },
+        { "not": { "const": "0" } }
+      ]
+    },
+    "wadRate": { "type": "string", "pattern": "^(?:0|[1-9][0-9]{0,17})$" },
+    "bps": { "type": "string", "pattern": "^(?:0|[1-9][0-9]{0,3}|10000)$" },
+    "sint": {
+      "type": "string",
+      "pattern": "^(0|-?[1-9][0-9]*)$",
+      "maxLength": 79,
+      "$comment": "signed 256-bit integer; a conforming verifier enforces the exact two-sided range"
+    },
     "address": { "type": "string", "pattern": "^0x[0-9a-f]{40}$" },
+    "nonzeroAddress": { "type": "string", "pattern": "^0x(?!0{40}$)[0-9a-f]{40}$" },
     "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "nonzeroHash": {
+      "allOf": [
+        { "$ref": "#/$defs/hash" },
+        { "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" } }
+      ]
+    },
+    "bytes4": { "type": "string", "pattern": "^0x[0-9a-f]{8}$" },
     "hexData": { "type": "string", "pattern": "^0x([0-9a-f]{2})*$" },
+    "ecdsaSignature": { "type": "string", "pattern": "^0x[0-9a-f]{130}$" },
+    "pmvsValue": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "array", "items": { "$ref": "#/$defs/pmvsValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/pmvsValue" } }
+      ]
+    },
+    "pmvsObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/pmvsValue" }
+    },
     "subject": {
       "type": "object",
       "required": ["chainId", "shareToken"],
       "properties": {
         "chainId": { "$ref": "#/$defs/uint" },
-        "shareToken": { "$ref": "#/$defs/address" }
+        "shareToken": { "$ref": "#/$defs/nonzeroAddress" }
       },
       "additionalProperties": false
     },
@@ -35,13 +89,14 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$" },
         "critical": { "type": "boolean" },
-        "value": {}
+        "value": { "$ref": "#/$defs/pmvsValue" }
       },
       "additionalProperties": false
     },
     "extensions": {
       "type": "array",
-      "items": { "$ref": "#/$defs/extension" }
+      "items": { "$ref": "#/$defs/extension" },
+      "uniqueItems": true
     },
     "subjectContext": {
       "type": "object",
@@ -49,12 +104,12 @@
       "properties": {
         "stream": { "const": "subject" },
         "kind": { "type": "string" },
-        "sequence": { "$ref": "#/$defs/uint" },
+        "sequence": { "$ref": "#/$defs/uint64" },
         "prev": { "$ref": "#/$defs/hash" },
-        "producedAt": { "$ref": "#/$defs/uint" },
-        "valuationTime": { "$ref": "#/$defs/uint" },
-        "epoch": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] },
-        "slot": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] },
+        "producedAt": { "$ref": "#/$defs/uint64" },
+        "valuationTime": { "$ref": "#/$defs/uint64" },
+        "epoch": { "oneOf": [{ "$ref": "#/$defs/uint64" }, { "type": "null" }] },
+        "slot": { "oneOf": [{ "$ref": "#/$defs/uint64" }, { "type": "null" }] },
         "late": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -66,10 +121,10 @@
         "stream": { "const": "watcher" },
         "producer": { "$ref": "#/$defs/address" },
         "kind": { "const": "watcher-observation" },
-        "sequence": { "$ref": "#/$defs/uint" },
+        "sequence": { "$ref": "#/$defs/uint64" },
         "prev": { "$ref": "#/$defs/hash" },
-        "producedAt": { "$ref": "#/$defs/uint" },
-        "observationTime": { "$ref": "#/$defs/uint" },
+        "producedAt": { "$ref": "#/$defs/uint64" },
+        "observationTime": { "$ref": "#/$defs/uint64" },
         "late": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -84,7 +139,7 @@
         "components": { "$ref": "#/$defs/hash" },
         "context": { "type": "object" },
         "extensions": { "$ref": "#/$defs/extensions" },
-        "meta": { "type": "object" }
+        "meta": { "$ref": "#/$defs/pmvsObject" }
       }
     },
     "interfaceClaim": {
@@ -97,13 +152,33 @@
       },
       "additionalProperties": false
     },
+    "capability": {
+      "type": "object",
+      "required": ["id", "operation", "caller", "target", "selectors", "effect", "mutable", "rotationAuthority"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "operation": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "caller": { "$ref": "#/$defs/address" },
+        "target": { "$ref": "#/$defs/address" },
+        "selectors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/bytes4" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "effect": { "enum": ["mint", "burn", "transfer", "approve", "upgrade", "configure", "sign", "settle", "anchor"] },
+        "mutable": { "type": "boolean" },
+        "rotationAuthority": { "enum": ["settlement", "valuation", "fee", "custody", "governance"] }
+      },
+      "additionalProperties": false
+    },
     "contractComponent": {
       "type": "object",
       "required": ["role", "chainId", "address", "accountType", "runtimeCodeHash", "proxy"],
       "properties": {
         "role": { "type": "string", "minLength": 1 },
         "chainId": { "$ref": "#/$defs/uint" },
-        "address": { "$ref": "#/$defs/address" },
+        "address": { "$ref": "#/$defs/nonzeroAddress" },
         "accountType": { "enum": ["contract", "eoa"] },
         "runtimeCodeHash": { "$ref": "#/$defs/hash" },
         "proxy": {
@@ -113,9 +188,66 @@
               "type": "object",
               "required": ["implementation", "implementationCodeHash", "admin"],
               "properties": {
-                "implementation": { "$ref": "#/$defs/address" },
-                "implementationCodeHash": { "$ref": "#/$defs/hash" },
-                "admin": { "$ref": "#/$defs/address" }
+                "implementation": { "$ref": "#/$defs/nonzeroAddress" },
+                "implementationCodeHash": { "$ref": "#/$defs/nonzeroHash" },
+                "admin": {
+                  "oneOf": [{ "$ref": "#/$defs/nonzeroAddress" }, { "type": "null" }],
+                  "$comment": "null means no dedicated proxy-admin getter; it does not prove that implementation resolution or storage is immutable"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "accountType": { "const": "eoa" } }, "required": ["accountType"] },
+          "then": {
+            "properties": {
+              "runtimeCodeHash": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+              "proxy": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "accountType": { "const": "contract" } }, "required": ["accountType"] },
+          "then": { "properties": { "runtimeCodeHash": { "$ref": "#/$defs/nonzeroHash" } } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": ["role", "holder", "source"],
+      "properties": {
+        "role": { "enum": ["settlement", "valuation", "fee", "custody", "governance"] },
+        "holder": { "$ref": "#/$defs/nonzeroAddress" },
+        "source": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type", "contract", "getter", "eventTopic"],
+              "properties": {
+                "type": { "const": "onchain" },
+                "contract": { "$ref": "#/$defs/nonzeroAddress" },
+                "getter": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+                "eventTopic": { "oneOf": [{ "$ref": "#/$defs/nonzeroHash" }, { "type": "null" }] }
+              },
+              "anyOf": [
+                { "properties": { "getter": { "type": "string", "minLength": 1 } }, "required": ["getter"] },
+                { "properties": { "eventTopic": { "$ref": "#/$defs/nonzeroHash" } }, "required": ["eventTopic"] }
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["type", "contract", "getter", "eventTopic"],
+              "properties": {
+                "type": { "const": "attested" },
+                "contract": { "type": "null" },
+                "getter": { "type": "null" },
+                "eventTopic": { "type": "null" }
               },
               "additionalProperties": false
             }
@@ -124,25 +256,91 @@
       },
       "additionalProperties": false
     },
-    "authority": {
+    "componentActivationCheck": {
       "type": "object",
-      "required": ["role", "holder", "source"],
+      "required": ["id", "target", "callData", "expectedReturnDataHash"],
       "properties": {
-        "role": { "enum": ["settlement", "valuation", "fee", "custody", "governance"] },
-        "holder": { "$ref": "#/$defs/address" },
-        "source": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "target": { "$ref": "#/$defs/nonzeroAddress" },
+        "callData": { "$ref": "#/$defs/hexData" },
+        "expectedReturnDataHash": { "$ref": "#/$defs/hash" }
+      },
+      "additionalProperties": false
+    },
+    "componentActivation": {
+      "type": "object",
+      "required": ["nonce", "actionCommitment", "conditions"],
+      "properties": {
+        "nonce": { "$ref": "#/$defs/positiveUint64" },
+        "actionCommitment": { "$ref": "#/$defs/nonzeroHash" },
+        "conditions": {
           "type": "object",
-          "required": ["type", "contract", "getter", "eventTopic"],
+          "required": ["expectedActive", "validFromBlock", "validThroughBlock", "checks"],
           "properties": {
-            "type": { "enum": ["onchain", "attested"] },
-            "contract": { "oneOf": [{ "$ref": "#/$defs/address" }, { "type": "null" }] },
-            "getter": { "oneOf": [{ "type": "string" }, { "type": "null" }] },
-            "eventTopic": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+            "expectedActive": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "required": ["recordHash", "generation", "anchor"],
+                  "properties": {
+                    "recordHash": { "$ref": "#/$defs/nonzeroHash" },
+                    "generation": { "$ref": "#/$defs/uint64" },
+                    "anchor": { "$ref": "#/$defs/nonzeroAddress" }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "validFromBlock": { "$ref": "#/$defs/uint64" },
+            "validThroughBlock": { "$ref": "#/$defs/uint64" },
+            "checks": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/componentActivationCheck" },
+              "uniqueItems": true
+            }
           },
           "additionalProperties": false
         }
       },
       "additionalProperties": false
+    },
+    "componentMigrationWatcherHead": {
+      "type": "object",
+      "required": ["streamId", "sequence", "kind", "recordHash"],
+      "properties": {
+        "streamId": { "$ref": "#/$defs/nonzeroHash" },
+        "sequence": { "$ref": "#/$defs/uint64" },
+        "kind": { "const": "10" },
+        "recordHash": { "$ref": "#/$defs/nonzeroHash" }
+      },
+      "additionalProperties": false
+    },
+    "componentAnchorTransition": {
+      "type": "object",
+      "required": ["oldAnchor", "newAnchor", "continuingWatcherHeads"],
+      "properties": {
+        "oldAnchor": { "$ref": "#/$defs/nonzeroAddress" },
+        "newAnchor": { "$ref": "#/$defs/nonzeroAddress" },
+        "continuingWatcherHeads": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/componentMigrationWatcherHead" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "componentMigration": {
+      "type": "object",
+      "properties": {
+        "anchorTransition": {
+          "oneOf": [
+            { "$ref": "#/$defs/componentAnchorTransition" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": { "$ref": "#/$defs/pmvsValue" }
     },
     "componentsRecord": {
       "type": "object",
@@ -150,7 +348,7 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["subjectId", "generation", "supersedes", "share", "accountingAsset", "portfolio", "interfaces", "profiles", "contracts", "authorities", "publication", "profileParameters", "migration"],
+          "required": ["subjectId", "generation", "supersedes", "activation", "share", "accountingAsset", "portfolio", "interfaces", "profiles", "contracts", "authorities", "capabilities", "publication", "profileParameters", "migration"],
           "properties": {
             "schema": { "const": "pmvs/components" },
             "context": {
@@ -160,13 +358,15 @@
               ]
             },
             "subjectId": { "$ref": "#/$defs/hash" },
-            "generation": { "$ref": "#/$defs/uint" },
+            "generation": { "$ref": "#/$defs/uint64" },
             "supersedes": { "$ref": "#/$defs/hash" },
+            "activation": { "$ref": "#/$defs/componentActivation" },
             "share": {
               "type": "object",
-              "required": ["decimals", "economicUnit", "permit", "pausable", "allowList", "transferFee", "rebase", "hooks", "adminMutable"],
+              "required": ["decimals", "initialPps", "economicUnit", "permit", "pausable", "allowList", "transferFee", "rebase", "hooks", "adminMutable"],
               "properties": {
-                "decimals": { "$ref": "#/$defs/uint" },
+                "decimals": { "$ref": "#/$defs/uint8" },
+                "initialPps": { "$ref": "#/$defs/positiveUint" },
                 "economicUnit": { "const": "pro-rata-nav" },
                 "permit": { "type": "boolean" },
                 "pausable": { "type": "boolean" },
@@ -200,13 +400,13 @@
               "required": ["chainId", "address", "decimals", "unit"],
               "properties": {
                 "chainId": { "$ref": "#/$defs/uint" },
-                "address": { "$ref": "#/$defs/address" },
-                "decimals": { "$ref": "#/$defs/uint" },
+                "address": { "$ref": "#/$defs/nonzeroAddress" },
+                "decimals": { "$ref": "#/$defs/uint8" },
                 "unit": { "type": "string", "minLength": 1 }
               },
               "additionalProperties": false
             },
-            "interfaces": { "type": "array", "items": { "$ref": "#/$defs/interfaceClaim" } },
+            "interfaces": { "type": "array", "items": { "$ref": "#/$defs/interfaceClaim" }, "uniqueItems": true },
             "profiles": {
               "type": "object",
               "required": ["settlement", "anchor", "requestLiveness", "valuation", "venue", "storage", "watcher"],
@@ -225,6 +425,7 @@
               "type": "array",
               "items": { "$ref": "#/$defs/contractComponent" },
               "minItems": 7,
+              "uniqueItems": true,
               "allOf": [
                 { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "share-vault" } } }, "minContains": 1 },
                 { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "settlement" } } }, "minContains": 1 },
@@ -235,14 +436,37 @@
                 { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "anchor" } } }, "minContains": 1 }
               ]
             },
-            "authorities": { "type": "array", "items": { "$ref": "#/$defs/authority" }, "minItems": 5 },
+            "authorities": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/authority" },
+              "minItems": 5,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "allOf": [
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "settlement" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "valuation" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "fee" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "custody" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "governance" } } }, "minContains": 1 }
+              ]
+            },
+            "capabilities": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/capability" },
+              "minItems": 1,
+              "uniqueItems": true
+            },
             "publication": {
               "type": "object",
               "required": ["confirmationDepth", "captureWindowSeconds", "graceSeconds", "cadence"],
               "properties": {
-                "confirmationDepth": { "$ref": "#/$defs/uint" },
-                "captureWindowSeconds": { "$ref": "#/$defs/uint" },
-                "graceSeconds": { "type": "object" },
+                "confirmationDepth": { "$ref": "#/$defs/uint64" },
+                "captureWindowSeconds": { "$ref": "#/$defs/positiveUint64" },
+                "graceSeconds": {
+                  "type": "object",
+                  "propertyNames": { "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+                  "additionalProperties": { "$ref": "#/$defs/uint64" }
+                },
                 "cadence": {
                   "oneOf": [
                     { "type": "null" },
@@ -250,10 +474,10 @@
                       "type": "object",
                       "required": ["origin", "seconds", "evaluationWindowSeconds", "maxConsecutiveGaps"],
                       "properties": {
-                        "origin": { "$ref": "#/$defs/uint" },
-                        "seconds": { "$ref": "#/$defs/uint" },
-                        "evaluationWindowSeconds": { "$ref": "#/$defs/uint" },
-                        "maxConsecutiveGaps": { "$ref": "#/$defs/uint" }
+                        "origin": { "$ref": "#/$defs/uint64" },
+                        "seconds": { "$ref": "#/$defs/positiveUint64" },
+                        "evaluationWindowSeconds": { "$ref": "#/$defs/positiveUint64" },
+                        "maxConsecutiveGaps": { "$ref": "#/$defs/uint64" }
                       },
                       "additionalProperties": false
                     }
@@ -262,8 +486,11 @@
               },
               "additionalProperties": false
             },
-            "profileParameters": { "type": "object" },
-            "migration": { "oneOf": [{ "type": "object" }, { "type": "null" }] }
+            "profileParameters": { "$ref": "#/$defs/pmvsObject" },
+            "migration": {
+              "oneOf": [{ "$ref": "#/$defs/componentMigration" }, { "type": "null" }],
+              "$comment": "Component semantics recursively reject transactionHash, txHash, blockHash, blockNumber, transactionIndex, txIndex, and logIndex anywhere in a component record's open objects. Future activation locators are post-action evidence."
+            }
           }
         }
       ],
@@ -271,14 +498,15 @@
     },
     "chainRead": {
       "type": "object",
-      "required": ["role", "contract", "callData", "returnData", "decoded", "unit"],
+      "required": ["id", "role", "contract", "callData", "returnData", "decoded", "unit"],
       "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
         "role": { "type": "string", "minLength": 1 },
         "contract": { "$ref": "#/$defs/address" },
         "callData": { "$ref": "#/$defs/hexData" },
         "returnData": { "$ref": "#/$defs/hexData" },
-        "decoded": {},
-        "unit": { "type": "string" }
+        "decoded": { "$ref": "#/$defs/pmvsValue" },
+        "unit": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
@@ -289,7 +517,7 @@
         "chainId": { "$ref": "#/$defs/uint" },
         "blockNumber": { "$ref": "#/$defs/uint" },
         "blockHash": { "$ref": "#/$defs/hash" },
-        "blockTimestamp": { "$ref": "#/$defs/uint" },
+        "blockTimestamp": { "$ref": "#/$defs/uint64" },
         "reads": { "type": "array", "items": { "$ref": "#/$defs/chainRead" } }
       },
       "additionalProperties": false
@@ -300,26 +528,117 @@
       "properties": {
         "source": { "type": "string", "minLength": 1 },
         "request": { "type": "string", "minLength": 1 },
-        "startedAtMs": { "$ref": "#/$defs/uint" },
-        "endedAtMs": { "$ref": "#/$defs/uint" },
+        "startedAtMs": { "$ref": "#/$defs/uint64" },
+        "endedAtMs": { "$ref": "#/$defs/uint64" },
         "bytesHash": { "$ref": "#/$defs/hash" },
-        "locations": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "correlation": { "type": "object" }
+        "locations": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "correlation": { "$ref": "#/$defs/pmvsObject" }
+      },
+      "additionalProperties": false
+    },
+    "valueLine": {
+      "type": "object",
+      "required": ["id", "amount", "unit", "evidenceReadIds"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "amount": { "$ref": "#/$defs/uint" },
+        "unit": { "type": "string", "minLength": 1 },
+        "evidenceReadIds": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "valuationExclusion": {
+      "type": "object",
+      "required": ["id", "category", "amount", "maximumPayout", "reason", "evidenceReadIds"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "category": { "enum": ["position", "cash", "overlay", "liability", "other"] },
+        "amount": { "$ref": "#/$defs/uint" },
+        "maximumPayout": { "$ref": "#/$defs/uint" },
+        "reason": { "type": "string", "minLength": 1 },
+        "evidenceReadIds": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "assetBalance": {
+      "type": "object",
+      "required": ["account", "asset", "before", "after"],
+      "properties": {
+        "account": { "$ref": "#/$defs/address" },
+        "asset": { "$ref": "#/$defs/address" },
+        "before": { "$ref": "#/$defs/uint" },
+        "after": { "$ref": "#/$defs/uint" }
+      },
+      "additionalProperties": false
+    },
+    "reserveBucket": {
+      "type": "object",
+      "required": ["id", "asset", "before", "after"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "asset": { "$ref": "#/$defs/address" },
+        "before": { "$ref": "#/$defs/uint" },
+        "after": { "$ref": "#/$defs/uint" }
+      },
+      "additionalProperties": false
+    },
+    "fundingSource": {
+      "type": "object",
+      "required": ["account", "assetBalanceBefore", "encumberedBefore", "freeBefore"],
+      "properties": {
+        "account": { "$ref": "#/$defs/address" },
+        "assetBalanceBefore": { "$ref": "#/$defs/uint" },
+        "encumberedBefore": { "$ref": "#/$defs/uint" },
+        "freeBefore": { "$ref": "#/$defs/uint" }
+      },
+      "additionalProperties": false
+    },
+    "positionHolding": {
+      "type": "object",
+      "required": ["custodyAccount", "quantity"],
+      "properties": {
+        "custodyAccount": { "$ref": "#/$defs/address" },
+        "quantity": { "$ref": "#/$defs/positiveUint" }
       },
       "additionalProperties": false
     },
     "positionOutput": {
       "type": "object",
-      "required": ["tokenId", "markMethod", "filled", "unfilled", "grossMark", "venueExitCost", "mark", "maximumPayout", "venueReferenceMark"],
+      "required": ["chainId", "positionContract", "positionId", "holdings", "aggregateQuantity", "markMethod", "filled", "unfilled", "unfilledMaximumPayout", "grossMark", "venueExitCost", "mark", "maximumPayout", "materialityReference", "materialityBps", "observationHashes", "venueReferenceMark"],
       "properties": {
-        "tokenId": { "$ref": "#/$defs/uint" },
+        "chainId": { "$ref": "#/$defs/uint" },
+        "positionContract": { "$ref": "#/$defs/address" },
+        "positionId": { "$ref": "#/$defs/uint" },
+        "holdings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/positionHolding" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "aggregateQuantity": { "$ref": "#/$defs/positiveUint" },
         "markMethod": { "enum": ["cross", "redemption", "writeoff_zero_bid", "excluded_negligible"] },
         "filled": { "$ref": "#/$defs/uint" },
         "unfilled": { "$ref": "#/$defs/uint" },
+        "unfilledMaximumPayout": { "$ref": "#/$defs/uint" },
         "grossMark": { "$ref": "#/$defs/uint" },
         "venueExitCost": { "$ref": "#/$defs/uint" },
         "mark": { "$ref": "#/$defs/uint" },
         "maximumPayout": { "$ref": "#/$defs/uint" },
+        "materialityReference": { "$ref": "#/$defs/uint" },
+        "materialityBps": { "oneOf": [{ "$ref": "#/$defs/bps" }, { "type": "null" }] },
+        "observationHashes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hash" },
+          "uniqueItems": true
+        },
         "venueReferenceMark": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] }
       },
       "additionalProperties": false
@@ -361,7 +680,7 @@
                 "engineVersion": { "type": "string", "minLength": 1 },
                 "sourceCommit": { "type": "string", "minLength": 1 },
                 "artifactHash": { "$ref": "#/$defs/hash" },
-                "parameters": { "type": "object" }
+                "parameters": { "$ref": "#/$defs/pmvsObject" }
               },
               "additionalProperties": false
             },
@@ -372,22 +691,23 @@
                 "chainState": { "type": "array", "items": { "$ref": "#/$defs/chainState" }, "minItems": 1 },
                 "venueState": {
                   "type": "object",
-                  "required": ["profile", "positions", "books", "responses"],
+                  "required": ["profile"],
                   "properties": {
-                    "profile": { "type": "string", "minLength": 1 },
-                    "positions": { "type": "array", "items": { "type": "object" } },
-                    "books": { "type": "array", "items": { "type": "object" } },
-                    "responses": { "type": "array", "items": { "$ref": "#/$defs/rawResponse" } }
+                    "profile": { "type": "string", "minLength": 1 }
                   },
-                  "additionalProperties": false
+                  "$comment": "The selected venue profile supplies and closes every other property.",
+                  "additionalProperties": true
                 },
                 "capture": {
                   "type": "object",
-                  "required": ["startedAtMs", "endedAtMs", "maxSkewMs"],
+                  "required": ["startedAtMs", "endedAtMs", "maxSkewMs", "maxVenueResponseLagMs", "maxCaptureAgeMs", "validUntil"],
                   "properties": {
-                    "startedAtMs": { "$ref": "#/$defs/uint" },
-                    "endedAtMs": { "$ref": "#/$defs/uint" },
-                    "maxSkewMs": { "$ref": "#/$defs/uint" }
+                    "startedAtMs": { "$ref": "#/$defs/uint64" },
+                    "endedAtMs": { "$ref": "#/$defs/uint64" },
+                    "maxSkewMs": { "$ref": "#/$defs/uint64" },
+                    "maxVenueResponseLagMs": { "$ref": "#/$defs/uint64" },
+                    "maxCaptureAgeMs": { "$ref": "#/$defs/positiveUint64" },
+                    "validUntil": { "$ref": "#/$defs/positiveUint64" }
                   },
                   "additionalProperties": false
                 }
@@ -396,9 +716,14 @@
             },
             "outputs": {
               "type": "object",
-              "required": ["perPosition", "cashValue", "overlayValue", "positionsValue", "grossAssets", "liabilities", "navSigned", "nav", "navDeficit", "totalSupply", "pps", "referencePps"],
+              "required": ["perPosition", "cashLines", "overlayLines", "liabilityLines", "exclusionLines", "aggregateUnfilledMaximumPayout", "cashValue", "overlayValue", "positionsValue", "grossAssets", "liabilities", "navSigned", "nav", "navDeficit", "totalSupply", "pps", "referencePps"],
               "properties": {
                 "perPosition": { "type": "array", "items": { "$ref": "#/$defs/positionOutput" } },
+                "cashLines": { "type": "array", "items": { "$ref": "#/$defs/valueLine" }, "uniqueItems": true },
+                "overlayLines": { "type": "array", "items": { "$ref": "#/$defs/valueLine" }, "uniqueItems": true },
+                "liabilityLines": { "type": "array", "items": { "$ref": "#/$defs/valueLine" }, "uniqueItems": true },
+                "exclusionLines": { "type": "array", "items": { "$ref": "#/$defs/valuationExclusion" }, "uniqueItems": true },
+                "aggregateUnfilledMaximumPayout": { "$ref": "#/$defs/uint" },
                 "cashValue": { "$ref": "#/$defs/uint" },
                 "overlayValue": { "$ref": "#/$defs/uint" },
                 "positionsValue": { "$ref": "#/$defs/uint" },
@@ -420,30 +745,32 @@
     },
     "depositClaim": {
       "type": "object",
-      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedAssets", "shares", "proof"],
+      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedAssets", "shares", "leafIndex", "proof"],
       "properties": {
-        "requestId": { "$ref": "#/$defs/uint" },
-        "owner": { "$ref": "#/$defs/address" },
-        "queuedEpoch": { "$ref": "#/$defs/uint" },
-        "settlementEpoch": { "$ref": "#/$defs/uint" },
+        "requestId": { "$ref": "#/$defs/positiveUint" },
+        "owner": { "$ref": "#/$defs/nonzeroAddress" },
+        "queuedEpoch": { "$ref": "#/$defs/uint64" },
+        "settlementEpoch": { "$ref": "#/$defs/uint64" },
         "queuedAssets": { "$ref": "#/$defs/uint" },
         "shares": { "$ref": "#/$defs/uint" },
-        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" } }
+        "leafIndex": { "$ref": "#/$defs/uint" },
+        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" }, "maxItems": 256 }
       },
       "additionalProperties": false
     },
     "withdrawClaim": {
       "type": "object",
-      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedShares", "assets", "dustFloorApplied", "proof"],
+      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedShares", "assets", "dustFloorApplied", "leafIndex", "proof"],
       "properties": {
-        "requestId": { "$ref": "#/$defs/uint" },
-        "owner": { "$ref": "#/$defs/address" },
-        "queuedEpoch": { "$ref": "#/$defs/uint" },
-        "settlementEpoch": { "$ref": "#/$defs/uint" },
+        "requestId": { "$ref": "#/$defs/positiveUint" },
+        "owner": { "$ref": "#/$defs/nonzeroAddress" },
+        "queuedEpoch": { "$ref": "#/$defs/uint64" },
+        "settlementEpoch": { "$ref": "#/$defs/uint64" },
         "queuedShares": { "$ref": "#/$defs/uint" },
         "assets": { "$ref": "#/$defs/uint" },
-        "dustFloorApplied": { "type": "boolean" },
-        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" } }
+        "dustFloorApplied": { "const": false },
+        "leafIndex": { "$ref": "#/$defs/uint" },
+        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" }, "maxItems": 256 }
       },
       "additionalProperties": false
     },
@@ -453,40 +780,53 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["settlement", "deposit", "withdraw", "excluded", "supersedesUnexecuted", "winddownPin"],
+          "required": ["settlement", "deposit", "withdraw", "excluded", "supersedesUnexecuted"],
           "properties": {
             "schema": { "const": "pmvs/settlement-archive" },
             "context": {
               "allOf": [
                 { "$ref": "#/$defs/subjectContext" },
-                { "type": "object", "properties": { "kind": { "const": "settlement-archive" }, "epoch": { "$ref": "#/$defs/uint" } }, "required": ["epoch"] }
+                { "type": "object", "properties": { "kind": { "const": "settlement-archive" }, "epoch": { "$ref": "#/$defs/positiveUint64" } }, "required": ["epoch"] }
               ]
             },
             "settlement": {
               "type": "object",
-              "required": ["settlementProfile", "settlementVersion", "grossPps", "ppsFinal", "highWaterMark", "feeRate", "valuationRecord", "merkleProfile", "requestLiveness"],
+              "required": ["settlementProfile", "settlementVersion", "priceAttempt", "grossPps", "ppsFinal", "highWaterMark", "feeRate", "validUntil", "valuationRecord", "merkleProfile", "requestLiveness", "claimDeadline"],
               "properties": {
                 "settlementProfile": { "type": "string", "minLength": 1 },
-                "settlementVersion": { "$ref": "#/$defs/uint" },
-                "grossPps": { "$ref": "#/$defs/uint" },
-                "ppsFinal": { "$ref": "#/$defs/uint" },
+                "settlementVersion": { "$ref": "#/$defs/uint64" },
+                "priceAttempt": { "$ref": "#/$defs/positiveUint64" },
+                "grossPps": { "$ref": "#/$defs/positiveUint" },
+                "ppsFinal": { "$ref": "#/$defs/positiveUint" },
                 "highWaterMark": { "$ref": "#/$defs/uint" },
-                "feeRate": { "$ref": "#/$defs/uint" },
-                "valuationRecord": { "$ref": "#/$defs/hash" },
+                "feeRate": { "$ref": "#/$defs/wadRate" },
+                "validUntil": { "$ref": "#/$defs/positiveUint64" },
+                "valuationRecord": { "$ref": "#/$defs/nonzeroHash" },
                 "merkleProfile": { "type": "string", "minLength": 1 },
-                "requestLiveness": { "enum": ["bounded", "operator-dependent"] }
+                "requestLiveness": { "enum": ["bounded", "operator-dependent"] },
+                "claimDeadline": { "oneOf": [{ "$ref": "#/$defs/uint64" }, { "type": "null" }] }
               },
+              "allOf": [
+                {
+                  "if": { "properties": { "requestLiveness": { "const": "bounded" } }, "required": ["requestLiveness"] },
+                  "then": { "properties": { "claimDeadline": { "$ref": "#/$defs/positiveUint64" } } }
+                },
+                {
+                  "if": { "properties": { "requestLiveness": { "const": "operator-dependent" } }, "required": ["requestLiveness"] },
+                  "then": { "properties": { "claimDeadline": { "type": "null" } } }
+                }
+              ],
               "additionalProperties": false
             },
             "deposit": {
               "type": "object",
               "required": ["requestIds", "root", "totalAssets", "totalShares", "claims"],
               "properties": {
-                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/uint" } },
+                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/positiveUint" }, "uniqueItems": true },
                 "root": { "$ref": "#/$defs/hash" },
                 "totalAssets": { "$ref": "#/$defs/uint" },
                 "totalShares": { "$ref": "#/$defs/uint" },
-                "claims": { "type": "array", "items": { "$ref": "#/$defs/depositClaim" } }
+                "claims": { "type": "array", "items": { "$ref": "#/$defs/depositClaim" }, "uniqueItems": true }
               },
               "additionalProperties": false
             },
@@ -494,11 +834,11 @@
               "type": "object",
               "required": ["requestIds", "root", "totalShares", "totalAssets", "claims"],
               "properties": {
-                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/uint" } },
+                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/positiveUint" }, "uniqueItems": true },
                 "root": { "$ref": "#/$defs/hash" },
                 "totalShares": { "$ref": "#/$defs/uint" },
                 "totalAssets": { "$ref": "#/$defs/uint" },
-                "claims": { "type": "array", "items": { "$ref": "#/$defs/withdrawClaim" } }
+                "claims": { "type": "array", "items": { "$ref": "#/$defs/withdrawClaim" }, "uniqueItems": true }
               },
               "additionalProperties": false
             },
@@ -509,14 +849,16 @@
                 "required": ["leg", "requestId", "reason"],
                 "properties": {
                   "leg": { "enum": ["deposit", "withdraw"] },
-                  "requestId": { "$ref": "#/$defs/uint" },
+                  "requestId": { "$ref": "#/$defs/positiveUint" },
                   "reason": { "enum": ["zero_output", "carried_forward", "cancelled", "policy_block"] }
                 },
                 "additionalProperties": false
               }
             },
-            "supersedesUnexecuted": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
-            "winddownPin": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+            "supersedesUnexecuted": {
+              "oneOf": [{ "$ref": "#/$defs/nonzeroHash" }, { "type": "null" }],
+              "$comment": "A semantic verifier binds a non-null value to the latest unresolved, receipt-less, registry-anchored pre-action record for the same subject and epoch, across either branch. The named record must have an earlier stream sequence and an earlier priceAttempt."
+            }
           }
         }
       ],
@@ -528,16 +870,49 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["archiveHash", "transaction", "observed", "retirement"],
+          "required": ["action", "transaction", "observed", "retirement"],
           "properties": {
             "schema": { "const": "pmvs/settlement-receipt" },
             "context": {
               "allOf": [
                 { "$ref": "#/$defs/subjectContext" },
-                { "type": "object", "properties": { "kind": { "const": "receipt" }, "epoch": { "$ref": "#/$defs/uint" } }, "required": ["epoch"] }
+                { "type": "object", "properties": { "kind": { "const": "receipt" }, "epoch": { "$ref": "#/$defs/positiveUint64" } }, "required": ["epoch"] }
               ]
             },
-            "archiveHash": { "$ref": "#/$defs/hash" },
+            "action": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["type", "recordKind", "recordHash"],
+                  "properties": {
+                    "type": { "const": "normal-roll" },
+                    "recordKind": { "const": "settlement-archive" },
+                    "recordHash": {
+                      "allOf": [
+                        { "$ref": "#/$defs/hash" },
+                        { "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" } }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": ["type", "recordKind", "recordHash"],
+                  "properties": {
+                    "type": { "const": "zero-nav" },
+                    "recordKind": { "const": "winddown-opened" },
+                    "recordHash": {
+                      "allOf": [
+                        { "$ref": "#/$defs/hash" },
+                        { "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" } }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
             "transaction": {
               "type": "object",
               "required": ["hash", "blockNumber", "blockHash", "transactionIndex", "events"],
@@ -546,20 +921,42 @@
                 "blockNumber": { "$ref": "#/$defs/uint" },
                 "blockHash": { "$ref": "#/$defs/hash" },
                 "transactionIndex": { "$ref": "#/$defs/uint" },
-                "events": { "type": "array", "items": { "type": "object" } }
+                "events": { "type": "array", "items": { "$ref": "#/$defs/pmvsObject" } }
               },
               "additionalProperties": false
             },
             "observed": {
               "type": "object",
-              "required": ["ppsFinal", "feeSharesMinted", "finalFeeAssets", "totalSupplyBefore", "totalSupplyAfter", "assetBalances"],
+              "required": ["priceAttempt", "valuationRecord", "grossPps", "validUntil", "executionTimestamp", "ppsFinal", "feeSharesMinted", "finalFeeAssets", "sourceAssets", "encumberedBefore", "freeBefore", "totalSupplyBefore", "totalSupplyAfter", "reserveBuckets", "fundingSources", "assetBalances"],
               "properties": {
+                "priceAttempt": { "$ref": "#/$defs/positiveUint64" },
+                "valuationRecord": { "$ref": "#/$defs/nonzeroHash" },
+                "grossPps": { "$ref": "#/$defs/uint" },
+                "validUntil": { "$ref": "#/$defs/positiveUint64" },
+                "executionTimestamp": { "$ref": "#/$defs/uint64" },
                 "ppsFinal": { "$ref": "#/$defs/uint" },
                 "feeSharesMinted": { "$ref": "#/$defs/uint" },
                 "finalFeeAssets": { "$ref": "#/$defs/uint" },
+                "sourceAssets": { "$ref": "#/$defs/uint" },
+                "encumberedBefore": { "$ref": "#/$defs/uint" },
+                "freeBefore": { "$ref": "#/$defs/uint" },
                 "totalSupplyBefore": { "$ref": "#/$defs/uint" },
                 "totalSupplyAfter": { "$ref": "#/$defs/uint" },
-                "assetBalances": { "type": "array", "items": { "type": "object" } }
+                "reserveBuckets": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/reserveBucket" },
+                  "uniqueItems": true
+                },
+                "fundingSources": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/fundingSource" },
+                  "uniqueItems": true
+                },
+                "assetBalances": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/assetBalance" },
+                  "uniqueItems": true
+                }
               },
               "additionalProperties": false
             },
@@ -572,7 +969,65 @@
               },
               "additionalProperties": false
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "action": {
+                    "type": "object",
+                    "properties": { "type": { "const": "normal-roll" } },
+                    "required": ["type"]
+                  }
+                },
+                "required": ["action"]
+              },
+              "then": {
+                "properties": {
+                  "observed": {
+                    "type": "object",
+                    "properties": {
+                      "grossPps": { "$ref": "#/$defs/positiveUint" },
+                      "ppsFinal": { "$ref": "#/$defs/positiveUint" }
+                    }
+                  },
+                  "retirement": {
+                    "type": "object",
+                    "properties": { "triggered": { "const": false }, "reason": { "type": "null" } }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "action": {
+                    "type": "object",
+                    "properties": { "type": { "const": "zero-nav" } },
+                    "required": ["type"]
+                  }
+                },
+                "required": ["action"]
+              },
+              "then": {
+                "properties": {
+                  "observed": {
+                    "type": "object",
+                    "properties": {
+                      "grossPps": { "const": "0" },
+                      "ppsFinal": { "const": "0" },
+                      "feeSharesMinted": { "const": "0" },
+                      "finalFeeAssets": { "const": "0" }
+                    }
+                  },
+                  "retirement": {
+                    "type": "object",
+                    "properties": { "triggered": { "const": false }, "reason": { "type": "null" } }
+                  }
+                }
+              }
+            }
+          ]
         }
       ],
       "unevaluatedProperties": false
@@ -583,7 +1038,7 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["slot", "reason", "explanation"],
+          "required": ["reason", "explanation"],
           "properties": {
             "schema": { "const": "pmvs/gap" },
             "context": {
@@ -592,7 +1047,6 @@
                 { "type": "object", "properties": { "kind": { "const": "gap" }, "slot": { "$ref": "#/$defs/uint" } }, "required": ["slot"] }
               ]
             },
-            "slot": { "$ref": "#/$defs/uint" },
             "reason": { "enum": ["venue_unavailable", "chain_unavailable", "operator_unavailable", "unsafe_capture", "storage_unavailable", "other"] },
             "explanation": { "type": "string", "minLength": 1 }
           }
@@ -619,7 +1073,7 @@
             "reasonCode": { "enum": ["clerical", "source", "methodology", "execution", "authority", "other"] },
             "explanation": { "type": "string", "minLength": 1 },
             "changesSettlementBearingOutput": { "type": "boolean" },
-            "replacement": {},
+            "replacement": { "$ref": "#/$defs/pmvsValue" },
             "onchainEffect": { "type": "string" },
             "remediation": { "type": "string" }
           }
@@ -633,53 +1087,124 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["reason", "openedAt", "gates", "openPositionsPlan", "pendingRequestsPlan", "reversalRule"],
+          "required": ["priceAttempt", "grossPps", "valuationRecord", "validUntil", "reason", "openedAt", "gates", "openPositionsPlan", "pendingRequestsPlan", "reversalRule", "supersedesUnexecuted"],
           "properties": {
             "schema": { "const": "pmvs/winddown-opened" },
             "context": {
               "allOf": [
                 { "$ref": "#/$defs/subjectContext" },
-                { "type": "object", "properties": { "kind": { "const": "winddown-opened" } } }
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "const": "winddown-opened" },
+                    "epoch": { "$ref": "#/$defs/positiveUint64" }
+                  },
+                  "required": ["epoch"]
+                }
               ]
             },
+            "priceAttempt": { "$ref": "#/$defs/positiveUint64" },
+            "grossPps": { "const": "0" },
+            "valuationRecord": { "$ref": "#/$defs/nonzeroHash" },
+            "validUntil": { "$ref": "#/$defs/positiveUint64" },
             "reason": { "type": "string", "minLength": 1 },
             "openedAt": { "$ref": "#/$defs/uint" },
-            "gates": { "type": "object" },
+            "gates": { "$ref": "#/$defs/pmvsObject" },
             "openPositionsPlan": { "type": "string", "minLength": 1 },
             "pendingRequestsPlan": { "type": "string", "minLength": 1 },
-            "reversalRule": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+            "reversalRule": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+            "supersedesUnexecuted": {
+              "oneOf": [{ "$ref": "#/$defs/nonzeroHash" }, { "type": "null" }],
+              "$comment": "A semantic verifier binds a non-null value to the latest unresolved, receipt-less, registry-anchored pre-action record for the same subject and epoch, across either branch. The named record must have an earlier stream sequence and an earlier priceAttempt."
+            }
           }
         }
       ],
       "unevaluatedProperties": false
     },
-    "pinRecord": {
+    "retirementResolution": {
       "type": "object",
-      "allOf": [
-        { "$ref": "#/$defs/recordBase" },
+      "required": ["action", "timing", "beneficiary", "evidenceHash"],
+      "properties": {
+        "action": { "enum": ["redeem", "burn", "transfer", "distribute", "pay", "release", "waive"] },
+        "timing": { "const": "before-finalization" },
+        "beneficiary": { "oneOf": [{ "$ref": "#/$defs/nonzeroAddress" }, { "type": "null" }] },
+        "evidenceHash": { "$ref": "#/$defs/nonzeroHash" }
+      },
+      "additionalProperties": false,
+      "$comment": "This object records evidence of a resolution completed before the finalization transaction. The wrapper does not consume it as an instruction. Beneficiary nullability is action- and profile-dependent. The independent retirement verifier checks the action, beneficiary, canonical evidence, timing, and completion."
+    },
+    "retirementResidualPosition": {
+      "type": "object",
+      "required": ["id", "position", "custodyAccount", "quantity", "resolution"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "position": { "$ref": "#/$defs/pmvsObject" },
+        "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
+        "quantity": { "$ref": "#/$defs/positiveUint" },
+        "resolution": { "$ref": "#/$defs/retirementResolution" }
+      },
+      "additionalProperties": false
+    },
+    "retirementResidualCash": {
+      "type": "object",
+      "required": ["id", "chainId", "account", "asset", "amount", "resolution"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "chainId": { "$ref": "#/$defs/positiveUint" },
+        "account": { "$ref": "#/$defs/nonzeroAddress" },
+        "asset": { "$ref": "#/$defs/nonzeroAddress" },
+        "amount": { "$ref": "#/$defs/positiveUint" },
+        "resolution": { "$ref": "#/$defs/retirementResolution" }
+      },
+      "additionalProperties": false
+    },
+    "retirementFeeAccrual": {
+      "type": "object",
+      "required": ["id", "denomination", "amount", "resolution"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "denomination": { "enum": ["shares", "accounting-asset"] },
+        "amount": { "$ref": "#/$defs/positiveUint" },
+        "resolution": { "$ref": "#/$defs/retirementResolution" }
+      },
+      "additionalProperties": false
+    },
+    "retirementLiability": {
+      "type": "object",
+      "required": ["id", "amount", "unit", "resolution"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "amount": { "$ref": "#/$defs/positiveUint" },
+        "unit": { "type": "string", "minLength": 1 },
+        "resolution": { "$ref": "#/$defs/retirementResolution" }
+      },
+      "additionalProperties": false
+    },
+    "retirementRecovery": {
+      "oneOf": [
         {
           "type": "object",
-          "required": ["grossPps", "netPps", "highWaterMark", "feeRate", "firstEpoch", "reserveAssets", "dustReserveAssets", "residualPolicy"],
+          "required": ["status", "rightsCount", "manifestHash"],
           "properties": {
-            "schema": { "const": "pmvs/retirement-pin" },
-            "context": {
-              "allOf": [
-                { "$ref": "#/$defs/subjectContext" },
-                { "type": "object", "properties": { "kind": { "const": "retirement-pin" } } }
-              ]
-            },
-            "grossPps": { "$ref": "#/$defs/uint" },
-            "netPps": { "$ref": "#/$defs/uint" },
-            "highWaterMark": { "$ref": "#/$defs/uint" },
-            "feeRate": { "$ref": "#/$defs/uint" },
-            "firstEpoch": { "$ref": "#/$defs/uint" },
-            "reserveAssets": { "$ref": "#/$defs/uint" },
-            "dustReserveAssets": { "$ref": "#/$defs/uint" },
-            "residualPolicy": { "type": "string", "minLength": 1 }
-          }
+            "status": { "const": "none" },
+            "rightsCount": { "const": "0" },
+            "manifestHash": { "type": "null" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["status", "rightsCount", "manifestHash"],
+          "properties": {
+            "status": { "const": "resolved-before-finalization" },
+            "rightsCount": { "$ref": "#/$defs/positiveUint" },
+            "manifestHash": { "$ref": "#/$defs/nonzeroHash" }
+          },
+          "additionalProperties": false
         }
       ],
-      "unevaluatedProperties": false
+      "$comment": "Subject retirement cannot leave an open or migrated recovery right. A resolved manifest records pre-finalization evidence that the wrapper does not consume as calldata. The independent retirement verifier proves that the manifest is exhaustive and that every named right was resolved before the finalization transaction."
     },
     "finalRecord": {
       "type": "object",
@@ -687,27 +1212,48 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["scope", "reason", "lastArchiveHash", "finalSupply", "pendingRequests", "outstandingClaims", "claimFunding", "residualPositions", "residualCash", "liabilities", "recoveryPath", "migration"],
+          "required": ["scope", "reason", "lastArchiveHash", "finalSupply", "pendingRequests", "outstandingClaims", "claimFunding", "residualPositions", "residualCash", "feeAccruals", "liabilities", "recovery", "migration"],
           "properties": {
             "schema": { "const": "pmvs/retirement-final" },
             "context": {
               "allOf": [
                 { "$ref": "#/$defs/subjectContext" },
-                { "type": "object", "properties": { "kind": { "const": "retirement-final" } } }
+                {
+                  "type": "object",
+                  "properties": { "kind": { "const": "retirement-final" } },
+                  "not": {
+                    "properties": { "epoch": {} },
+                    "required": ["epoch"]
+                  }
+                }
               ]
             },
-            "scope": { "enum": ["generation", "subject"] },
-            "reason": { "enum": ["supply-exhausted", "zero-nav", "superseded", "governance-closure", "other"] },
+            "scope": { "const": "subject" },
+            "reason": { "enum": ["supply-exhausted", "zero-nav", "governance-closure", "other"] },
             "lastArchiveHash": { "$ref": "#/$defs/hash" },
-            "finalSupply": { "$ref": "#/$defs/uint" },
-            "pendingRequests": { "$ref": "#/$defs/uint" },
-            "outstandingClaims": { "$ref": "#/$defs/uint" },
-            "claimFunding": { "$ref": "#/$defs/uint" },
-            "residualPositions": { "type": "array", "items": { "type": "object" } },
-            "residualCash": { "type": "array", "items": { "type": "object" } },
-            "liabilities": { "type": "array", "items": { "type": "object" } },
-            "recoveryPath": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
-            "migration": { "oneOf": [{ "type": "object" }, { "type": "null" }] }
+            "finalSupply": { "const": "0" },
+            "pendingRequests": { "const": "0" },
+            "outstandingClaims": { "const": "0" },
+            "claimFunding": { "const": "0" },
+            "residualPositions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/retirementResidualPosition" },
+              "uniqueItems": true,
+              "$comment": "Entries disclose completed pre-finalization resolutions that the wrapper does not consume as instructions. An empty array claims that no nonzero residual position required resolution. The independent verifier proves completeness against the custody perimeter."
+            },
+            "residualCash": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/retirementResidualCash" },
+              "uniqueItems": true,
+              "$comment": "Entries disclose completed pre-finalization resolutions that the wrapper does not consume as instructions. An empty array claims that no nonzero residual cash balance required resolution. The independent verifier proves completeness against the custody perimeter."
+            },
+            "feeAccruals": { "type": "array", "items": { "$ref": "#/$defs/retirementFeeAccrual" }, "uniqueItems": true },
+            "liabilities": { "type": "array", "items": { "$ref": "#/$defs/retirementLiability" }, "uniqueItems": true },
+            "recovery": { "$ref": "#/$defs/retirementRecovery" },
+            "migration": {
+              "type": "null",
+              "$comment": "Core v1 retirement-final is subject-only. Component generation replacement uses a components migration before retirement."
+            }
           }
         }
       ],
@@ -749,7 +1295,7 @@
               "required": ["profile", "books", "responses"],
               "properties": {
                 "profile": { "type": "string", "minLength": 1 },
-                "books": { "type": "array", "items": { "type": "object" } },
+                "books": { "type": "array", "items": { "$ref": "#/$defs/pmvsObject" } },
                 "responses": { "type": "array", "items": { "$ref": "#/$defs/rawResponse" } }
               },
               "additionalProperties": false
@@ -768,7 +1314,6 @@
         { "$ref": "#/$defs/gapRecord" },
         { "$ref": "#/$defs/correctionRecord" },
         { "$ref": "#/$defs/winddownRecord" },
-        { "$ref": "#/$defs/pinRecord" },
         { "$ref": "#/$defs/finalRecord" },
         { "$ref": "#/$defs/watcherRecord" }
       ]
@@ -779,12 +1324,18 @@
       "properties": {
         "recordHash": { "$ref": "#/$defs/hash" },
         "scheme": { "enum": ["eip712-ecdsa", "eip712-erc1271"] },
-        "verifyingContract": { "$ref": "#/$defs/address" },
+        "verifyingContract": { "$ref": "#/$defs/nonzeroAddress" },
         "streamId": { "$ref": "#/$defs/hash" },
         "previousAnchor": { "$ref": "#/$defs/hash" },
-        "signer": { "$ref": "#/$defs/address" },
+        "signer": { "$ref": "#/$defs/nonzeroAddress" },
         "signature": { "$ref": "#/$defs/hexData" }
       },
+      "allOf": [
+        {
+          "if": { "properties": { "scheme": { "const": "eip712-ecdsa" } }, "required": ["scheme"] },
+          "then": { "properties": { "signature": { "$ref": "#/$defs/ecdsaSignature" } } }
+        }
+      ],
       "additionalProperties": false
     }
   }

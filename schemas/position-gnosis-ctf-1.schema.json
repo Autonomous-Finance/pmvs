@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://autonomous.finance/pmvs/schemas/position-gnosis-ctf-1.schema.json",
+  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.1/schemas/position-gnosis-ctf-1.schema.json",
   "title": "PMVS Gnosis CTF position profile v1",
   "type": "object",
   "required": [
@@ -21,7 +21,7 @@
   ],
   "properties": {
     "profile": { "const": "position/gnosis-ctf/1" },
-    "chainId": { "$ref": "#/$defs/uint" },
+    "chainId": { "$ref": "#/$defs/positiveUint256" },
     "positionContract": { "$ref": "#/$defs/nonzeroAddress" },
     "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
     "collateralToken": { "$ref": "#/$defs/nonzeroAddress" },
@@ -33,15 +33,25 @@
     },
     "conditionId": { "$ref": "#/$defs/bytes32" },
     "parentCollectionId": { "$ref": "#/$defs/bytes32" },
-    "indexSet": { "$ref": "#/$defs/positiveUint" },
+    "indexSet": { "$ref": "#/$defs/positiveUint256" },
     "collectionId": { "$ref": "#/$defs/bytes32" },
-    "positionId": { "$ref": "#/$defs/uint" },
-    "quantity": { "$ref": "#/$defs/positiveUint" }
+    "positionId": { "$ref": "#/$defs/uint256" },
+    "quantity": { "$ref": "#/$defs/positiveUint256" }
   },
   "additionalProperties": false,
   "$defs": {
-    "uint": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)$" },
-    "positiveUint": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "uint256": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "maxLength": 78,
+      "$comment": "uint256; semantic validation enforces the exact upper bound"
+    },
+    "positiveUint256": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$",
+      "maxLength": 78,
+      "$comment": "positive uint256; semantic validation enforces the exact upper bound"
+    },
     "nonzeroAddress": { "type": "string", "pattern": "^0x(?!0{40}$)[0-9a-f]{40}$" },
     "bytes32": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" }
   }

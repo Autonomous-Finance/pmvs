@@ -1,0 +1,376 @@
+{
+  "profile": "venue/polymarket/1",
+  "custodyConfigs": [
+    {
+      "custodyConfigId": "custody-deposit",
+      "custodyAccount": "0x1111111111111111111111111111111111111111",
+      "walletKind": "deposit-wallet-v2",
+      "signatureType": "3",
+      "makerAddress": "0x1111111111111111111111111111111111111111",
+      "orderSignerAddress": "0x1111111111111111111111111111111111111111",
+      "accountSignerAddress": "0x2222222222222222222222222222222222222222",
+      "owner": "0x2222222222222222222222222222222222222222",
+      "pendingOwner": null,
+      "pendingOwnerDeadline": "0",
+      "pendingOwnerNonce": "0",
+      "runtimeCodeHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "factory": "0x00000000000fb5c9adea0298d729a0cb3823cc07",
+      "factoryCodeHash": "0xaaa52c8cc8a0e3fd27ce756cc6b4e70c51423e9b597b11f32d3e49f8b1fc890d",
+      "factoryImplementation": "0x528cc05efac2b0d255e423272187efd41248abd7",
+      "factoryImplementationCodeHash": "0xe6424f1008e46b4b657efacf9500ea7747cbbf3055d9d76459253ac2884793d2",
+      "proxyMode": "deposit-shared-erc1967",
+      "implementationResolver": "0x7a18edfe055488a3128f01f563e5b479d92ffc3a",
+      "implementationResolverCodeHash": "0xf87b06a1302051471df08ff79a938757509569e16b7a7efa55a3ea7b29b0b9d1",
+      "implementation": "0xf7f27c29e60fe6325bef8da7f93250353d2e3294",
+      "implementationCodeHash": "0xf5c1072460e64902af84d35f5bb1d0a15d80a88c5827b831a977fbc5a0684b96",
+      "controllers": [
+        "0x2222222222222222222222222222222222222222"
+      ],
+      "threshold": "1",
+      "modules": [],
+      "guard": null,
+      "fallbackHandler": null,
+      "pausedAt": "0",
+      "implementationPinned": false,
+      "sessionSigners": [],
+      "passkeySessionSigners": [],
+      "nonce": "7"
+    }
+  ],
+  "positions": [
+    {
+      "position": {
+        "profile": "position/gnosis-ctf/1",
+        "chainId": "137",
+        "positionContract": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+        "custodyAccount": "0x1111111111111111111111111111111111111111",
+        "collateralToken": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+        "oracle": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+        "questionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "outcomeSlotCount": "2",
+        "conditionId": "0x113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e43",
+        "parentCollectionId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "indexSet": "1",
+        "collectionId": "0x18c94738afab745bfc20e22f9c1b59737d4c9926f768b2deb3d2178348c7c7c8",
+        "positionId": "36514843516657196877512344755168185053011809766475250230217290275943919345757",
+        "quantity": "1000"
+      },
+      "custodyConfigId": "custody-deposit",
+      "marketKind": "standard",
+      "routeId": "route-standard",
+      "standardOracleConfigId": "oracle-standard",
+      "negRiskConfigId": null,
+      "redemptionExecutionId": "execute-standard",
+      "conditionPreparation": {
+        "blockNumber": "100",
+        "blockHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+        "transactionHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+        "logIndex": "2",
+        "oracle": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+        "questionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "outcomeSlotCount": "2"
+      },
+      "userPausedBlockAt": "0",
+      "isUserPaused": false,
+      "reservedQuantity": "0",
+      "venueReportedSize": null
+    },
+    {
+      "position": {
+        "profile": "position/gnosis-ctf/1",
+        "chainId": "137",
+        "positionContract": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+        "custodyAccount": "0x1111111111111111111111111111111111111111",
+        "collateralToken": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+        "oracle": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+        "questionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "outcomeSlotCount": "2",
+        "conditionId": "0x113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e43",
+        "parentCollectionId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "indexSet": "2",
+        "collectionId": "0x200ac81a7f170a3f853fccf0df70c8cdcc31d4a07b46642721e395f85ec3f4a9",
+        "positionId": "79390224001321173055338472256805431098942983393240380634991902486169272057429",
+        "quantity": "600"
+      },
+      "custodyConfigId": "custody-deposit",
+      "marketKind": "standard",
+      "routeId": "route-standard",
+      "standardOracleConfigId": "oracle-standard",
+      "negRiskConfigId": null,
+      "redemptionExecutionId": "execute-standard",
+      "conditionPreparation": {
+        "blockNumber": "100",
+        "blockHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+        "transactionHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+        "logIndex": "2",
+        "oracle": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+        "questionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "outcomeSlotCount": "2"
+      },
+      "userPausedBlockAt": "0",
+      "isUserPaused": false,
+      "reservedQuantity": "0",
+      "venueReportedSize": null
+    }
+  ],
+  "books": [
+    {
+      "assetId": "36514843516657196877512344755168185053011809766475250230217290275943919345757",
+      "market": "0x113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e43",
+      "negRisk": false,
+      "venueTimestampMs": "1000",
+      "venueHash": "illustrative-book-0",
+      "minOrderSizeBase": "1",
+      "tickSizeU6": "1000",
+      "lastTradePriceU6": null,
+      "bids": [
+        {
+          "priceU6": "500000",
+          "quantity": "2000"
+        }
+      ],
+      "bidsTruncated": false,
+      "responseHash": "0x4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "assetId": "79390224001321173055338472256805431098942983393240380634991902486169272057429",
+      "market": "0x113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e43",
+      "negRisk": false,
+      "venueTimestampMs": "1000",
+      "venueHash": "illustrative-book-1",
+      "minOrderSizeBase": "1",
+      "tickSizeU6": "1000",
+      "lastTradePriceU6": null,
+      "bids": [
+        {
+          "priceU6": "500000",
+          "quantity": "2000"
+        }
+      ],
+      "bidsTruncated": false,
+      "responseHash": "0x5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "routeConfigs": [
+    {
+      "routeId": "route-standard",
+      "marketKind": "standard",
+      "exchange": "0xe111180000d2663c0091e4f400237545b87b996b",
+      "exchangeCodeHash": "0xa08da89bbac2063dfa6a705e70314d218d40fb2b2a6405442297c241fcd58401",
+      "exchangeCollateralToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "ctf": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+      "ctfCodeHash": "0xbe524e094025c2a1122ccfbe3264e29fe662d7e0ae518b6926135c814405eceb",
+      "ctfCollateralToken": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+      "outcomeTokenFactory": "0xada100874d00e3331d00f2007a9c336a65009718",
+      "outcomeTokenFactoryCodeHash": "0x1ece8945fe803fe6a0ff4f10d13979830429f51463075f3f284031d8bc17d9ed",
+      "factoryConditionalTokens": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+      "factoryCollateralToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "factoryUsdce": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+      "factoryNegRiskAdapter": null,
+      "factoryWrappedCollateral": null,
+      "factoryPausedUsdce": false,
+      "legacySafeFactory": "0xaacfeea03eb1561c4e67d661e40682bd20e3541b",
+      "legacySafeFactoryCodeHash": "0x7a423db1d467bbd092e48044242a9c1f003442a83ca8109f0f7c07a50782e23d",
+      "legacySafeImplementation": "0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8",
+      "legacySafeImplementationCodeHash": "0xf4b625c76701938f75938880a926414b5f91471d32e21c0cbb37566b62495ca7",
+      "exchangePaused": false,
+      "userPauseBlockInterval": "100",
+      "maxFeeRateBps": "500",
+      "feeReceiver": "0x4444444444444444444444444444444444444444",
+      "sourceCommit": "ccc0596074f4dfd62c944fbca4de252893b82b4b"
+    }
+  ],
+  "standardOracleConfigs": [
+    {
+      "standardOracleConfigId": "oracle-standard",
+      "oracle": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+      "version": "v3.1.0",
+      "runtimeCodeHash": "0xe44d7e53a84493f6b71255e19f42f7cea9b8be486492fee80529c75d75f61579",
+      "ctf": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+      "optimisticOracle": "0xee3afe347d5c74317041e2618c49534daf887c24",
+      "collateralWhitelist": "0x1020ae36548ab28bc0c41fd2a08d24132c82cc55",
+      "questionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "initialized": true,
+      "flagged": false,
+      "ready": false,
+      "questionStateReturnData": "0x",
+      "sourceCommit": "10dd8829d710ed9c2541b4196b463ad0c90546fc"
+    }
+  ],
+  "negRiskConfigs": [],
+  "redemptionConfigs": [
+    {
+      "redemptionRouteId": "redeem-standard",
+      "marketKind": "standard",
+      "kind": "ctf-exchange-bound-factory",
+      "adapterRole": "exchange-bound-factory",
+      "entrypoint": "0xada100874d00e3331d00f2007a9c336a65009718",
+      "entrypointCodeHash": "0x1ece8945fe803fe6a0ff4f10d13979830429f51463075f3f284031d8bc17d9ed",
+      "rawCtfCollateralToken": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+      "intermediateOutputTokens": [
+        "0x2791bca1f2de4661ed88a30c99a7a9449aa84174"
+      ],
+      "accountingOutputToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "balanceSelection": "caller-full-binary-set",
+      "conditionalTokens": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+      "collateralToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "usdce": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+      "negRiskAdapter": null,
+      "wrappedCollateral": null,
+      "onramp": null,
+      "onrampCodeHash": null,
+      "sweepBalances": [
+        {
+          "account": "0xada100874d00e3331d00f2007a9c336a65009718",
+          "tokenContract": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+          "tokenId": null,
+          "amount": "0"
+        },
+        {
+          "account": "0xada100874d00e3331d00f2007a9c336a65009718",
+          "tokenContract": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+          "tokenId": "36514843516657196877512344755168185053011809766475250230217290275943919345757",
+          "amount": "0"
+        },
+        {
+          "account": "0xada100874d00e3331d00f2007a9c336a65009718",
+          "tokenContract": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+          "tokenId": "79390224001321173055338472256805431098942983393240380634991902486169272057429",
+          "amount": "0"
+        }
+      ],
+      "pausedUsdce": false,
+      "sourceCommits": [
+        "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+        "eeefca66eb46c800a9aaab88db2064a99026fde5"
+      ]
+    }
+  ],
+  "redemptionExecutions": [
+    {
+      "redemptionExecutionId": "execute-standard",
+      "custodyConfigId": "custody-deposit",
+      "marketKind": "standard",
+      "conditionId": "0x113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e43",
+      "payoutNumerators": [
+        "0",
+        "0"
+      ],
+      "payoutDenominator": "0",
+      "redemptionRouteId": "redeem-standard",
+      "coveredPositionIds": [
+        "36514843516657196877512344755168185053011809766475250230217290275943919345757",
+        "79390224001321173055338472256805431098942983393240380634991902486169272057429"
+      ],
+      "redemptionCalls": [
+        {
+          "target": "0xada100874d00e3331d00f2007a9c336a65009718",
+          "value": "0",
+          "calldataState": "exact",
+          "calldata": "0x01b7037c0000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa841740000000000000000000000000000000000000000000000000000000000000000113980104656c0f249f1a112a5dcbd9373df795238e5b57c9527852a92398e430000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002",
+          "expectedOutputToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+          "minimumOutputAmount": "1"
+        }
+      ]
+    }
+  ],
+  "orderCommitments": [],
+  "settlementFreezeConfigs": [],
+  "collateralConfig": {
+    "accountingToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+    "proxyCodeHash": "0xaaa52c8cc8a0e3fd27ce756cc6b4e70c51423e9b597b11f32d3e49f8b1fc890d",
+    "implementation": "0x6bbcef9f7ef3b6c592c99e0f206a0de94ad0925f",
+    "implementationCodeHash": "0x932c9369433b333d6d97d99b7731885751862aa3502122786d24174a9fd8e58e",
+    "decimals": "6",
+    "nativeUsdc": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+    "usdce": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+    "vault": "0x3333333333333333333333333333333333333333",
+    "totalSupply": "1000000",
+    "maxUsdceSettlementExposure": "1000",
+    "vaultUsdceBalance": "1000",
+    "vaultUsdceAllowance": "1000",
+    "onramp": "0x93070a847efef7f70739046a929d47a521f5b8ee",
+    "onrampCodeHash": "0x89eaba6b38dda7ebd07176f42f9e9f70dbadd46b7cbf826d15341729b19bb389",
+    "onrampCollateralToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+    "onrampPausedUsdce": false,
+    "offramp": "0x2957922eb93258b93368531d39facca3b4dc5854",
+    "offrampCodeHash": "0x18de842db0ec4b253afe413446ac5c6c26e878289f5c7a425a9464dbad72d45d",
+    "offrampCollateralToken": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+    "offrampPausedUsdce": false
+  },
+  "wrappedCollateralConfig": null,
+  "erc1155Approvals": [
+    {
+      "tokenContract": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+      "owner": "0x1111111111111111111111111111111111111111",
+      "operator": "0xada100874d00e3331d00f2007a9c336a65009718",
+      "approved": true,
+      "lastEventBlockNumber": null,
+      "lastEventTransactionHash": null,
+      "lastEventLogIndex": null
+    }
+  ],
+  "erc20Allowances": [],
+  "authorities": [
+    {
+      "contract": "0x00000000000fb5c9adea0298d729a0cb3823cc07",
+      "account": "0x47ebfac3353314c788b96cdcbf41daadfe03629c",
+      "role": "deposit-wallet-factory-upgrader",
+      "active": true,
+      "candidateSource": "event",
+      "lastEventBlockNumber": "9",
+      "lastEventTransactionHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "lastEventLogIndex": "0"
+    },
+    {
+      "contract": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "account": "0x2957922eb93258b93368531d39facca3b4dc5854",
+      "role": "wrapper",
+      "active": true,
+      "candidateSource": "route",
+      "lastEventBlockNumber": null,
+      "lastEventTransactionHash": null,
+      "lastEventLogIndex": null
+    },
+    {
+      "contract": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb",
+      "account": "0xada100874d00e3331d00f2007a9c336a65009718",
+      "role": "wrapper",
+      "active": true,
+      "candidateSource": "route",
+      "lastEventBlockNumber": null,
+      "lastEventTransactionHash": null,
+      "lastEventLogIndex": null
+    }
+  ],
+  "responses": [
+    {
+      "responseHash": "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "sourceProfile": "venue/polymarket/1",
+      "requestMethod": "GET",
+      "requestUrl": "https://clob.polymarket.com/book?token_id=36514843516657196877512344755168185053011809766475250230217290275943919345757",
+      "httpStatus": "200",
+      "startedAtMs": "900",
+      "endedAtMs": "1000",
+      "mediaType": "application/json",
+      "bodyLength": "42",
+      "retrievalUris": [
+        "ipfs://illustrative-book-0"
+      ]
+    },
+    {
+      "responseHash": "0x5555555555555555555555555555555555555555555555555555555555555555",
+      "sourceProfile": "venue/polymarket/1",
+      "requestMethod": "GET",
+      "requestUrl": "https://clob.polymarket.com/book?token_id=79390224001321173055338472256805431098942983393240380634991902486169272057429",
+      "httpStatus": "200",
+      "startedAtMs": "900",
+      "endedAtMs": "1000",
+      "mediaType": "application/json",
+      "bodyLength": "42",
+      "retrievalUris": [
+        "ipfs://illustrative-book-1"
+      ]
+    }
+  ]
+}

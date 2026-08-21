@@ -2,6 +2,9 @@
 
 PMVS specifies how an ERC-20 vault share maps to prediction-market inventory, NAV, and asynchronous settlement. A vague sentence, stale address, or changed rounding rule can alter what the share means or who receives value. Treat normative edits as protocol changes, not copy edits.
 
+By contributing, you agree that your contribution is released under
+[CC0-1.0](./LICENSE).
+
 ## Change classes
 
 Every pull request identifies one primary class:
@@ -54,11 +57,14 @@ Use the pinned Bun version. Run:
 
 ```sh
 bun install --frozen-lockfile
-bun test
+bun run check
 git diff --check
 ```
 
-The suite validates the JSON Schema, canonicalization, EIP-712 signatures, subject identity, Merkle vectors, fee arithmetic, relative links, and the repository prose gate. Passing tests do not replace contract security review, independent implementations, or economic review.
+The check runs strict TypeScript validation before the test suite. The tests validate the JSON Schema, canonicalization, EIP-712 signatures, subject identity, Merkle vectors, fee arithmetic, relative links, and the repository prose gate. Passing checks do not replace contract security review, independent implementations, or economic review.
+
+Report security-sensitive errors through the private process in
+[`SECURITY.md`](./SECURITY.md), not in a public issue.
 
 ## Review boundary
 

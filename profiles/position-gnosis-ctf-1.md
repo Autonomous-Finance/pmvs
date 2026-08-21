@@ -18,15 +18,15 @@ Polymarket describes CTF as an open standard developed by Gnosis. It has no EIP 
 
 A CTF position is identified by `(chainId, positionContract, positionId)`. A token id without its chain and contract is not a complete identity.
 
-Each venue inventory entry using this profile contains a `position` object. That object MUST contain the following fields. Integers use canonical decimal strings. Addresses and fixed bytes use lowercase PMVS-JCS hex. The position contract, custody account, collateral token, and oracle MUST be nonzero addresses.
+Each venue inventory entry using this profile contains a `position` object. That object MUST contain the following fields. Integers use canonical decimal strings. Addresses and fixed bytes use lowercase PMVS-JCS hex. The `chainId` and `quantity` values MUST be positive. The position contract, custody account, collateral token, and oracle MUST be nonzero addresses.
 
 | Field | Type and meaning |
 |---|---|
 | `profile` | MUST equal `position/gnosis-ctf/1` |
-| `chainId` | `uint256` chain containing the position contract and balance |
+| `chainId` | Positive `uint256` chain containing the position contract and balance |
 | `positionContract` | Address of the declared `ConditionalTokens` contract |
 | `custodyAccount` | Address whose ERC-1155 balance belongs to the vault |
-| `collateralToken` | Address of the ERC-20 token that backs the position |
+| `collateralToken` | Exact ERC-20 address used in the CTF position-id preimage and in split, merge, and redemption calls |
 | `oracle` | Address authorized by CTF to report the condition payout |
 | `questionId` | `bytes32` question identifier supplied to CTF |
 | `outcomeSlotCount` | `uint256` from 2 through 256 |
@@ -35,7 +35,7 @@ Each venue inventory entry using this profile contains a `position` object. That
 | `indexSet` | `uint256` nonempty proper subset of the condition's outcome slots |
 | `collectionId` | `bytes32` derived by the CTF collection algorithm |
 | `positionId` | `uint256` ERC-1155 token id derived from collateral and collection |
-| `quantity` | `uint256` from the pinned ERC-1155 balance read |
+| `quantity` | Positive `uint256` from the pinned ERC-1155 balance read |
 
 The active venue profile names each permitted `positionContract`. The component record activates `position/gnosis-ctf/1` before a declared custody account receives a CTF position.
 
@@ -67,11 +67,11 @@ These derivations identify the token. They do not establish its price, liquidity
 
 ## Verification procedure
 
-For each `position` object, a verifier performs these checks at the valuation's pinned block:
+For each `position` object, a verifier performs these checks at the valuation's pinned block. The record includes the block number, block hash, and block time. All state reads for one chain use that block.
 
 1. Match `positionContract` and `custodyAccount` against the active component and venue profiles. Match the pinned runtime-code hash and proxy implementation, if any.
 2. Apply the ERC-165 procedure: require `supportsInterface(0x01ffc9a7) == true`, `supportsInterface(0xffffffff) == false`, and `supportsInterface(0xd9b67a26) == true` for ERC-1155.
-3. Locate the contract's `ConditionPreparation` event for `conditionId`. Require its oracle, question id, and outcome slot count to equal the position entry.
+3. Locate the contract's `ConditionPreparation` event for `conditionId`. Record its block number, block hash, transaction hash, and log index. Require its oracle, question id, and outcome slot count to equal the position entry.
 4. Recompute `conditionId` with the packed encoding above and require an exact match.
 5. Read `getOutcomeSlotCount(conditionId)`. Require it to equal `outcomeSlotCount` and to be from 2 through 256.
 6. Let `fullIndexSet = 2^outcomeSlotCount - 1`, with `2^256 - 1` represented by the maximum `uint256`. Require `0 < indexSet < fullIndexSet`.
@@ -80,15 +80,17 @@ For each `position` object, a verifier performs these checks at the valuation's 
 9. Read `balanceOf(custodyAccount, positionId)`, or the equivalent entry in `balanceOfBatch`, and require it to equal `quantity`.
 10. Apply the venue profile's binding between `positionId` and the traded instrument, such as the Polymarket CLOB `asset_id`.
 
-A failed call, interface mismatch, event mismatch, derivation mismatch, or balance mismatch invalidates the position input. A venue-reported size cannot replace the pinned ERC-1155 balance.
+A failed call, interface mismatch, event mismatch, derivation mismatch, or balance mismatch invalidates the position input. A venue-reported size cannot replace the pinned ERC-1155 balance. A later event query or state read cannot be mixed into the same pinned snapshot.
 
 ## Inventory
 
-ERC-1155 does not enumerate the token ids held by an account. PMVS-M1 reconstructs a candidate set from every `TransferSingle` and `TransferBatch` log that touches each declared custody account, without filtering by emitting contract. The scan begins at chain genesis or at a checkpoint that proves the complete starting contract-and-token-id set and balances. It treats logs as candidates, verifies the emitter and token interface, and reads each pinned balance. The active component and venue profiles then classify each nonzero token as supported, unsupported, or demonstrably unsolicited. An unknown token cannot silently enter NAV. A mere event-signature match is not proof that the emitter is an ERC-1155 contract.
+ERC-1155 does not enumerate the token ids held by an account. PMVS-M1 reconstructs a candidate set from every `TransferSingle` and `TransferBatch` log that touches each declared custody account, without filtering by emitting contract. The scan begins at chain genesis or at a checkpoint that proves the complete starting contract-and-token-id set and balances. It treats logs as candidates, verifies the emitter and token interface, and reads each pinned balance. The active component and venue profiles then classify each nonzero token as supported or unsupported. Every supported nonzero token is a subject asset. An unknown token cannot silently enter NAV. A mere event-signature match is not proof that the emitter is an ERC-1155 contract.
 
-The token id is a one-way hash, so transfer logs alone do not reveal its collateral, condition, or index set. Venue metadata MAY propose those preimages. `ConditionPreparation`, `PositionSplit`, `PositionsMerge`, and `PayoutRedemption` logs MAY also supply them. The verifier still performs every derivation above. A nonzero id with no unique, verifiable field set is `UNVERIFIABLE_INVENTORY` and cannot support L2 valuation.
+The token id is a one-way hash, so transfer logs alone do not reveal its collateral, condition, or index set. Venue metadata MAY propose those preimages. `ConditionPreparation`, `PositionSplit`, `PositionsMerge`, and `PayoutRedemption` logs MAY also supply them. The verifier still performs every derivation above. A nonzero id with no unique, verifiable field set is `UNVERIFIABLE_INVENTORY` and cannot support an L1 evidence-bound settlement or any higher level. A schema-valid position object is not enough.
 
-An operator-maintained token list, open-order list, or venue API does not prove complete inventory. An unsolicited token remains in the inventory and follows the active profile's valuation or fail-closed rule.
+An operator-maintained token list, open-order list, or venue API does not prove complete inventory. How a supported token arrived does not change its treatment: it remains in inventory and follows the active profile's valuation rule.
+
+ERC-1155 has no view function that lists every operator approved by an owner. For each custody account and position contract, the verifier reconstructs operator candidates from all `ApprovalForAll` logs since deployment or a proved checkpoint. It then reads `isApprovedForAll(custodyAccount, operator)` for every candidate at the pinned block. The record includes revoked candidates as false entries. This procedure is necessary because `setApprovalForAll` applies to every token id that the owner holds in that ERC-1155 contract. It is not a position-specific approval.
 
 ## Lifecycle and payout
 
@@ -106,21 +108,23 @@ grossPayout = floor(
 )
 ```
 
-The multiplication uses checked full-precision arithmetic before the final floor.
+The contract uses `SafeMath.add` for the per-bit numerator sum, `SafeMath.mul(...).div(...)` for each position payout, and `SafeMath.add` for the call's total payout. These are checked `uint256` operations in that order. They are not a 512-bit `mulDiv`. An intermediate overflow makes the on-chain redemption revert, so this profile cannot claim an executable payout unless every operation succeeds with the recorded values.
 
-For `parentCollectionId == 0`, `redeemPositions` burns the position and returns the collateral token. For a nonzero parent, redemption returns a parent position instead of cash. A venue profile MUST define the complete route from that result into the accounting asset before M1 may treat it as a redemption mark.
+CTF `redeemPositions(collateralToken, parentCollectionId, conditionId, indexSets)` has no quantity argument. For each listed `indexSet`, it reads and burns the caller's entire balance of the derived position id. A redemption plan therefore records the full index-set list and the caller's before and after balances. It MUST NOT describe a partial redemption unless another contract first isolates the intended quantity in a separate account.
+
+For `parentCollectionId == 0`, CTF transfers `collateralToken` to the caller. For a nonzero parent, CTF mints `getPositionId(collateralToken, parentCollectionId)` to the caller. That parent ERC-1155 position is not cash. A venue profile MUST define and verify every remaining merge or redemption step before M1 may treat a nested position as an accounting-asset payout.
 
 ## Boundaries and risks
 
 - This profile proves token identity, balance, and CTF state at pinned blocks. It does not prove that the oracle answer, question wording, or market resolution is correct.
-- `setApprovalForAll` grants an operator authority over every CTF token held by an account. A deployment records the operator set and treats each approved operator as part of the custody threat model.
+- `setApprovalForAll` grants an operator authority over every CTF token held by an account in that CTF contract. A deployment reconstructs the operator set from events, pins each live approval, and treats each approved operator as part of the custody threat model.
 - Position ids can match across different CTF contracts. Verifiers always include chain id and contract address.
 - ERC-1155 compatibility does not imply CTF compatibility. A wrapper, bridge representation, off-chain venue balance, or Polymarket PositionManager token needs another versioned position profile.
 - Polymarket Combo positions use its separate Positions Framework. They are outside this profile even though PositionManager also implements ERC-1155.
 
 ## Primary references
 
-- [Gnosis Conditional Tokens developer guide](https://github.com/gnosis/conditional-tokens-contracts/blob/master/docs/developer-guide.rst)
+- [Pinned Gnosis Conditional Tokens developer guide at `eeefca6`](https://github.com/gnosis/conditional-tokens-contracts/blob/eeefca66eb46c800a9aaab88db2064a99026fde5/docs/developer-guide.rst)
 - [Pinned `CTHelpers.sol` at `eeefca6`](https://github.com/gnosis/conditional-tokens-contracts/blob/eeefca66eb46c800a9aaab88db2064a99026fde5/contracts/CTHelpers.sol)
 - [Pinned `ConditionalTokens.sol` at `eeefca6`](https://github.com/gnosis/conditional-tokens-contracts/blob/eeefca66eb46c800a9aaab88db2064a99026fde5/contracts/ConditionalTokens.sol)
 - [ERC-165](https://eips.ethereum.org/EIPS/eip-165)

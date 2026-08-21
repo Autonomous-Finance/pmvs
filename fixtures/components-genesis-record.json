@@ -16,8 +16,19 @@
   "subjectId": "0x119eba4ba90359458811e719965925e255c3537b907914b6428f775c8d297892",
   "generation": "0",
   "supersedes": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "activation": {
+    "nonce": "1",
+    "actionCommitment": "0x80fa675ea0ecf14f4710ad22c9901da753c161b89157a344a61538fc3583acef",
+    "conditions": {
+      "expectedActive": null,
+      "validFromBlock": "1",
+      "validThroughBlock": "1000",
+      "checks": []
+    }
+  },
   "share": {
     "decimals": "18",
+    "initialPps": "1000000000000000000",
     "economicUnit": "pro-rata-nav",
     "permit": true,
     "pausable": false,
@@ -65,11 +76,19 @@
   },
   "contracts": [
     {
-      "role": "share-vault",
+      "role": "accountant",
       "chainId": "137",
-      "address": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "address": "0x0000000000000000000000000000000000000004",
       "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeCodeHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "proxy": null
+    },
+    {
+      "role": "anchor",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000001",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
       "proxy": null
     },
     {
@@ -77,23 +96,15 @@
       "chainId": "137",
       "address": "0x0000000000000000000000000000000000000002",
       "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeCodeHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
       "proxy": null
     },
     {
-      "role": "teller",
+      "role": "share-vault",
       "chainId": "137",
-      "address": "0x0000000000000000000000000000000000000003",
+      "address": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
       "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-      "proxy": null
-    },
-    {
-      "role": "accountant",
-      "chainId": "137",
-      "address": "0x0000000000000000000000000000000000000004",
-      "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeCodeHash": "0x4444444444444444444444444444444444444444444444444444444444444444",
       "proxy": null
     },
     {
@@ -101,7 +112,7 @@
       "chainId": "137",
       "address": "0x0000000000000000000000000000000000000005",
       "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeCodeHash": "0x5555555555555555555555555555555555555555555555555555555555555555",
       "proxy": null
     },
     {
@@ -113,11 +124,11 @@
       "proxy": null
     },
     {
-      "role": "anchor",
+      "role": "teller",
       "chainId": "137",
-      "address": "0x0000000000000000000000000000000000000001",
+      "address": "0x0000000000000000000000000000000000000003",
       "accountType": "contract",
-      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeCodeHash": "0x6666666666666666666666666666666666666666666666666666666666666666",
       "proxy": null
     }
   ],
@@ -129,7 +140,7 @@
         "type": "onchain",
         "contract": "0x0000000000000000000000000000000000000002",
         "getter": "settlementAuthority()",
-        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "eventTopic": null
       }
     },
     {
@@ -139,7 +150,7 @@
         "type": "onchain",
         "contract": "0x0000000000000000000000000000000000000002",
         "getter": "valuationAuthority()",
-        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "eventTopic": null
       }
     },
     {
@@ -149,7 +160,7 @@
         "type": "onchain",
         "contract": "0x0000000000000000000000000000000000000002",
         "getter": "feeAuthority()",
-        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "eventTopic": null
       }
     },
     {
@@ -159,7 +170,7 @@
         "type": "onchain",
         "contract": "0x0000000000000000000000000000000000000002",
         "getter": "custodyAuthority()",
-        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "eventTopic": null
       }
     },
     {
@@ -169,8 +180,58 @@
         "type": "onchain",
         "contract": "0x0000000000000000000000000000000000000002",
         "getter": "governance()",
-        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "eventTopic": null
       }
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "buffer-distribution",
+      "operation": "distribute-asset",
+      "caller": "0x0000000000000000000000000000000000000003",
+      "target": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "selectors": [
+        "0x879333e9"
+      ],
+      "effect": "transfer",
+      "mutable": true,
+      "rotationAuthority": "governance"
+    },
+    {
+      "id": "buffer-to-strategy",
+      "operation": "vault-to-strategy",
+      "caller": "0x0000000000000000000000000000000000000006",
+      "target": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "selectors": [
+        "0xbb3e643f"
+      ],
+      "effect": "transfer",
+      "mutable": true,
+      "rotationAuthority": "governance"
+    },
+    {
+      "id": "share-burn",
+      "operation": "burn-shares",
+      "caller": "0x0000000000000000000000000000000000000003",
+      "target": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "selectors": [
+        "0xee7a7c04"
+      ],
+      "effect": "burn",
+      "mutable": true,
+      "rotationAuthority": "governance"
+    },
+    {
+      "id": "share-mint",
+      "operation": "mint-shares",
+      "caller": "0x0000000000000000000000000000000000000003",
+      "target": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "selectors": [
+        "0x528c198a"
+      ],
+      "effect": "mint",
+      "mutable": true,
+      "rotationAuthority": "governance"
     }
   ],
   "publication": {
@@ -186,6 +247,6 @@
   "migration": null,
   "extensions": [],
   "meta": {
-    "fixture": "illustrative addresses and code hashes; not a deployment record"
+    "fixture": "illustrative schema vector; not a deployment or conformance record"
   }
 }
