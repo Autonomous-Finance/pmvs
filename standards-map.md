@@ -1,6 +1,6 @@
 # Standards map
 
-PMVS has one purpose: define a fungible vault share over a rotating portfolio of prediction-market outcome positions. The standard adds the custody, valuation, asynchronous settlement, and lifecycle rules that give that share a consistent meaning. Existing ERCs still define the token and common vault interfaces.
+PMVS specifies an ERC-20 vault that holds prediction-market outcome positions. The positions may change without replacing the vault share. PMVS defines the custody, NAV, asynchronous settlement, and lifecycle rules behind that share. Existing ERCs define the token and common vault interfaces.
 
 This map favors Final standards with deployed, composable interfaces. Draft and Review proposals appear only as related work. Statuses were checked on 2026-08-21 and must be checked again before publication. An idea does not become a PMVS dependency until its interface and status are stable enough for that role.
 
@@ -58,9 +58,9 @@ ERC-8330 is close to the PMVS valuation layer, but the scopes differ. ERC-8330 s
 
 ## Reference architecture
 
-The [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small vault from its Manager, Teller, and Accountant. PMVS follows that modular pattern but narrows it to prediction-market portfolios. It adds a declared outcome-position custody perimeter, a venue-aware NAV method, asynchronous request settlement, claim funding, and retirement rules.
+The [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small vault from its Manager, Teller, and Accountant. PMVS uses that role split and adds an outcome-position custody perimeter, venue-aware NAV, asynchronous request settlement, claim funding, and retirement rules.
 
-The term describes the architecture and makes no claim about source-code inheritance. An implementation can use another contract suite if it satisfies the same PMVS behavior and declares every component.
+An implementation may use any contract suite if it declares every component and satisfies the PMVS requirements.
 
 ## EIP process status
 

@@ -54,6 +54,9 @@ This record tracks focused passes over the pre-EIP proposal. A pass has one main
 | 46 | Are prediction-market positions distinct from investor shares? | Defined outcome positions as portfolio assets and the ERC-20 as the durable proportional NAV unit. Removed language that could collapse the two layers. |
 | 47 | Does the machine-readable record carry the new vault model? | Added the portfolio kind, custody model, position formats, entry and exit asset modes, and `pro-rata-nav` share semantics to the component schema and fixture. |
 | 48 | Did the final vault rewrite survive technical and prose review? | Reapplied Orwell Writing, No AI Slop, and Humanizer in that order. Preserved the two-token model and normative rules, tightened the framing regression test, and passed the full local suite. |
+| 49 | Does the opening name the standardized object without a preamble? | Opened with the ERC-20 vault, named market shares as outcome positions, named the investor token as the vault share, and stated its pro-rata NAV basis in three sentences. |
+| 50 | Do the supporting Parts keep vault economics ahead of verification machinery? | Tightened Core, settlement, M1, and the standards map around custody, NAV, entry, exit, and the Boring Vault role split. Records now appear only where the required state must be reproduced or committed. |
+| 51 | Did compression remove a technical claim or reintroduce stock prose? | Restored the operator-control and off-chain-allocation facts found by the claim-preservation check. Re-ran Orwell Writing, No AI Slop, Humanizer, the lockfile install, and the full local suite. |
 
 ## Evidence used
 

@@ -13,23 +13,25 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Abstract
 
-PMVS defines tokenized vaults that hold prediction-market shares, called outcome positions in this proposal. Investors hold one ERC-20 share of the whole vault. The share stays in circulation while the strategy trades, merges, and redeems its outcome positions.
+PMVS specifies an ERC-20 vault that holds prediction-market shares. PMVS calls the market shares **outcome positions** and the investor token the **vault share**. Each vault share is a fungible, pro-rata unit of declared net asset value (NAV). The share token remains the same while the strategy trades, merges, and redeems outcome positions.
 
-The standard defines the economic subject, custody perimeter, accounting asset, component roles, asynchronous lifecycle, and minimum holder protections. It also defines the records and on-chain commitments needed when price per share depends on venue data and positions held outside the share-token contract. A verifier can reproduce settlement-bearing calculations from published inputs and compare chain-derived inputs with Ethereum state at pinned blocks.
+The `(chainId, shareToken)` pair identifies the vault. This Part defines its accounting asset, custody perimeter, component roles, lifecycle, and minimum holder protections. It also defines the records and on-chain commitments required to reproduce settlement calculations and compare recorded chain inputs with pinned Ethereum state.
 
-PMVS does not prove that an unsigned venue response was true. It also has no challenge period, fraud proof, bond, or veto in version 1. Atomic anchoring can require a record commitment before a covered action executes. It cannot force the record's external inputs to be honest.
+Part II defines asynchronous settlement. Part III defines PMVS-M1 valuation. Profiles bind contract interfaces, venues, storage systems, and watcher methods without placing deployment-specific facts in the core.
 
-This Part defines the vault model and common machinery used by every other Part. Part II defines asynchronous settlement. Part III defines PMVS-M1 valuation. Profiles bind settlement interfaces, venues, storage systems, and watcher methods without placing mutable deployment facts in the core.
+Version 1 can verify signed records, chain state, and deterministic arithmetic. It cannot prove that an unsigned venue response was true. It has no challenge period, fraud proof, bond, or veto.
 
 ## Motivation
 
-Prediction-market outcome positions are tied to specific questions and payout conditions. A managed strategy may hold many of them, then sell or redeem them and move to different markets. Making investors hold those positions directly would expose each investor to a changing set of ERC-1155 ids, settlement states, and venue operations.
+An outcome position is tied to one market and one payout condition. The vault sells, merges, or redeems it before moving capital into another market. A managed strategy holds many positions and enters new markets. Direct ownership would force investors to track changing ERC-1155 ids, resolution states, and venue operations.
 
-One ERC-20 vault share gives the strategy a durable funding unit. The share represents a proportional unit of the declared vault NAV while the underlying outcome positions change. Wallets and protocols can integrate that stable token. Investors enter and exit in one accounting asset while the vault keeps the changing portfolio in custody.
+The ERC-20 vault share is a continuing funding unit. Investors enter and exit in one accounting asset while the vault keeps the changing portfolio in custody. Wallets and protocols integrate the share without integrating each outcome position.
 
-The modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small share vault from a Manager, Teller, and Accountant. PMVS applies that split to prediction markets and adds a declared strategy-custody perimeter, outcome-position inventory, venue-aware valuation, asynchronous settlement, and terminal-state rules.
+ERC-20 defines token balances and transfers. It leaves custody, NAV, entry and exit pricing, fees, request states, claim funding, migration, and closure unspecified. PMVS defines those vault semantics and binds settlement-bearing facts to canonical records.
 
-The operator often controls both the external data capture and the settlement transaction. ERC-20 does not explain how external positions were valued, which requests were accepted, how fees changed the exchange rate, or whether claims are funded. PMVS gives these facts common semantics and a canonical record that binds them to the vault.
+The operator may control both venue-data capture and settlement submission. Canonical records bind its inputs and calculations to the resulting vault state.
+
+The modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small share vault from a Manager, Teller, and Accountant. PMVS keeps that split and adds strategy custody, outcome-position inventory, venue-aware valuation, asynchronous settlement, and terminal-state rules.
 
 ## Scope
 
@@ -63,7 +65,7 @@ Core v1 is EVM-specific. It uses Ethereum chain ids, 20-byte addresses, Keccak-2
 
 ## Vault architecture
 
-PMVS treats the vault as a group of components around one durable share token. A single contract may implement several roles. The component record MUST identify every role, the address for each on-chain component or authority, and the engine identity for each off-chain method.
+A PMVS vault consists of one share token plus its declared components and custody accounts. A single contract may implement several roles. The component record MUST identify every role, each on-chain component or authority, and each off-chain method engine.
 
 | Component role | Required responsibility |
 |---|---|
@@ -97,7 +99,7 @@ strategy custody  ------>  prediction-market outcome positions
 strategy manager
 ```
 
-The share-vault contract does not need to hold the outcome positions directly. An external strategy wallet can hold them. The component record brings that wallet into the vault's custody perimeter, and the valuation record includes its balances. This separation follows the Boring Vault pattern while adding the inventory and settlement rules needed for prediction markets.
+An external strategy wallet may hold the outcome positions while the share vault holds only an accounting-asset buffer. The component record places that wallet inside the custody perimeter, and each valuation includes its balances.
 
 ## Minimum vault invariants
 

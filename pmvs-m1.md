@@ -13,11 +13,11 @@ RFC 2119 / RFC 8174 keywords as in Part I.
 
 ## Abstract
 
-PMVS-M1 turns a changing portfolio of prediction-market outcome positions into the accounting value behind one durable ERC-20 vault share. It computes net asset value and price per share from controlled cash, explicit liabilities, and every outcome position in the declared custody perimeter.
+PMVS-M1 computes net asset value and price per share for a vault that holds prediction-market outcome positions. It includes controlled cash, explicit liabilities, and every outcome position in the declared custody perimeter.
 
 The method has two stages. Capture obtains chain and venue data and pins every input. Compute uses only those inputs, integer arithmetic, and declared parameters. An independent implementation can then reproduce the output.
 
-M1 is a conservative displayed-liquidity method. It is not fair value, liquidation value, or a promise of execution. A material position that cannot be priced under its depth and illiquidity rules blocks settlement rather than transferring the uncertainty between entering and exiting vault-share holders.
+M1 is a conservative displayed-liquidity method, not fair value, liquidation value, or a promise of execution. A material position that fails its depth or illiquidity rules blocks settlement. This prevents an uncertain mark from shifting value between entering and exiting vault-share holders.
 
 ```
 capture: operator and outside systems      compute: pure and repeatable
@@ -28,7 +28,7 @@ exact decimal parsing            --->      no clock, network, or hidden config
 capture timing and failures      --->      deterministic ordered output
 ```
 
-Valuation names its price concepts precisely. A resting order book is unsigned and cancellable. Crossing it in simulation yields gross cross proceeds. The venue profile then subtracts a deterministic upper bound on execution charges to produce the **displayed-book cross mark**. That mark is not a guaranteed exit value.
+A resting order book is unsigned and cancellable. M1 simulates a sale into its bids, then subtracts the venue profile's execution-cost cap. The result is the **displayed-book cross mark**, not a guaranteed exit value.
 
 ## Role in the vault standard
 
@@ -43,7 +43,7 @@ For each valuation, M1:
 5. computes NAV and gross price per share; and
 6. supplies that price to the settlement profile for deposits, redemptions, and fees.
 
-Outcome positions remain portfolio assets. M1 does not wrap each position into a new ERC-20 and does not distribute those positions to vault-share holders.
+Outcome positions remain in vault custody. M1 supplies their accounting-asset value to settlement. It does not wrap or distribute them.
 
 ## Marks
 
@@ -121,7 +121,7 @@ M1 runs at least once for each settlement and at the L3 cadence declared by the 
 
 ## Inventory completeness
 
-The single largest failure mode of venue-priced NAV is a silently incomplete position set. PMVS-M1 makes inventory a chain-derived fact rather than a venue-API answer:
+An omitted position misstates NAV. PMVS-M1 derives inventory from chain state rather than trusting a venue API list:
 
 1. **Universe reconstruction.** For every declared custody address, reconstruct the token-id universe from all ERC-1155 `TransferSingle` and `TransferBatch` logs that touch it, across every position-token contract in the venue profile. Scan from contract creation or from a checkpoint that proves the starting balance and token-id set. A cached operator list alone is not a checkpoint. Keep ids with nonzero balances and record unsolicited positions rather than hiding them.
 2. **Normative quantities.** Read balances with `balanceOfBatch(account, ids)` at the pinned valuation block. Venue-API sizes MAY appear as `venueReportedSize` to expose discrepancies, but they never replace chain balances.
@@ -153,7 +153,7 @@ Illiquid positions can shift value between depositor and redeemer cohorts. M1 th
 
 ## Quiescent capture
 
-A reproducible valuation needs a still target. At the declared capture boundary:
+M1 requires a quiescent state at the declared capture boundary:
 
 1. Every custody account MUST have zero open venue orders, no pending fills, no in-flight redemptions, and no undisclosed reserved or locked collateral. The component record defines the freeze procedure, including cancellation and repeated stable-empty checks.
 2. Chain reads execute at one pinned block per chain (`eth_call` at height), with the block number and block hash recorded per chain. Multi-chain overlays (below) pin their own blocks.

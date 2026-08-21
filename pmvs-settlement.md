@@ -13,15 +13,15 @@ RFC 2119 / RFC 8174 keywords as in Part I.
 
 ## Abstract
 
-This Part defines how a PMVS vault accepts accounting assets, issues ERC-20 vault shares, accepts shares for redemption, and returns the accounting asset after asynchronous settlement. Outcome positions remain inside the declared strategy-custody perimeter. Investors do not receive those positions during normal entry or exit.
+This Part specifies asynchronous conversion between the accounting asset and the ERC-20 vault share. Deposits escrow the accounting asset. Redemptions escrow vault shares. Settlement applies one price, mints or burns the aggregate share amount, funds the aggregate claims, and makes each selected user amount claimable. Outcome positions remain in strategy custody.
 
-This Part also defines `settlement/epoch-merkle/1`. The profile adds an epoch request and claim layer to a modular share vault, Teller, and Accountant. It computes user amounts off-chain, mints or burns aggregate shares, funds aggregate claims, and commits each allocation on-chain with Merkle roots.
+The `settlement/epoch-merkle/1` profile groups requests into epochs. An off-chain engine computes each selected allocation, and the contract commits those allocations with a Merkle root.
 
-PMVS is a vault standard. The epoch-Merkle design is one settlement profile. Another settlement system can define a versioned profile that maps its request states, accounting, events, funding, and claim path to the common requirements in this Part.
+Other settlement designs may conform through versioned profiles that map their request states, accounting, events, funding, and claim paths to this Part.
 
 ## Economic meaning of the share
 
-The ERC-20 share is the long-lived funding unit for the whole prediction-market vault. Outcome positions may resolve, merge, or leave the portfolio while the share continues. A settlement profile MUST state:
+The ERC-20 share persists while outcome positions resolve, merge, or leave the portfolio. A settlement profile MUST state:
 
 1. which assets or rights an accepted deposit receives;
 2. when shares are minted and burned;
@@ -47,15 +47,13 @@ The epoch-Merkle profile follows the component split in Part I:
 | Strategy manager | Raises accounting assets from the position portfolio and controls transfers to or from strategy custody |
 | Request adapter | Escrows requests, freezes epochs, commits allocations, funds claims, and verifies claim proofs |
 
-The strategy custody component sells or redeems positions when the vault needs accounting assets for withdrawals. Exiting investors receive the declared accounting asset under the settled price and rounding rules. The ERC-1155 outcome positions remain in vault custody.
+This profile adds asynchronous request states and Merkle claims to the modular Boring Vault roles. Strategy custody sells or redeems positions when the vault needs accounting assets for withdrawals. Exiting investors receive the accounting asset under the settled price and rounding rules. Outcome positions remain outside the share-vault contract in declared vault custody.
 
-This profile extends the modular Boring Vault pattern with asynchronous request states and Merkle claims. It does not require the share-vault contract itself to custody every portfolio position.
+## Required settlement lifecycle
 
-## Common settlement evidence
+Every settlement profile defines these stages:
 
-Every settlement profile defines the following observable stages:
-
-| Stage | Required evidence |
+| Stage | Required record or state |
 |---|---|
 | Request | Owner or controller, input amount, input asset, request identifier, timestamp or block, and initial state |
 | Freeze or transition | The event or state change that closes the request set or makes a result claimable |
@@ -66,13 +64,13 @@ Every settlement profile defines the following observable stages:
 | Receipt | Canonical transaction, block, event positions, state changes, and archive hash |
 | Escape | Timeout, cancellation, rescue, migration, and retirement behavior |
 
-A profile MUST define a deterministic verifier for every row. It MUST also state which properties the chain enforces and which properties only the archive exposes.
+A profile MUST define a deterministic verifier for every row. It MUST state which properties the chain enforces and which properties the archive exposes.
 
 ## Relationship to Ethereum vault interfaces
 
 ERC-4626 defines synchronous tokenized-vault entry, exit, estimates, and previews. ERC-7540 adds asynchronous deposit and redemption requests. ERC-7575 permits an external share token and multiple entry points. A PMVS deployment MAY claim any of these standards only when its contracts satisfy that full standard.
 
-New asynchronous settlement profiles SHOULD use the ERC-7540 request model and ERC-165 detection where their accounting can meet the standard. PMVS then adds evidence for external valuation and allocation. A custom request interface is allowed under its own profile, but it MUST NOT be labeled ERC-7540 by analogy.
+New asynchronous settlement profiles SHOULD use the ERC-7540 request model and ERC-165 detection where their accounting can meet the standard. PMVS adds the external valuation and allocation records. A custom request interface is allowed under its own profile, but it MUST NOT be labeled ERC-7540 by analogy.
 
 ## Profile `settlement/epoch-merkle/1`
 
@@ -189,7 +187,7 @@ Every deployment states one of these values in its component record:
 - `requestLiveness: "bounded"` means every request state has a declared maximum duration. An owner can cancel an unselected request after the pending deadline. A selected request with no valid funded claim has an on-chain remedy after the claim deadline. The remedy prevents both double payment and loss of escrow. Its ABI, delay, authority, and solvency rule are part of the settlement profile.
 - `requestLiveness: "operator-dependent"` means some request can remain pending or unclaimable until an operator or governance actor intervenes.
 
-A deployment MUST NOT claim bounded liveness because a monitor can raise an alarm or because governance could upgrade a contract. New production deployments SHOULD provide bounded liveness and obtain a separate security review of the remedy. This classification does not change L1 through L3, which measure evidence rather than contract safety.
+A monitor alarm or a possible governance upgrade does not provide bounded liveness. New production deployments SHOULD provide an on-chain remedy and obtain a separate security review of it. Request liveness is independent of the L1 through L3 conformance levels.
 
 #### Delegated claims (OPTIONAL extension)
 

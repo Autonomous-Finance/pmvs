@@ -13,12 +13,15 @@ describe("proposal prose", () => {
   test("contains no prohibited dash characters or stock AI wording", async () => {
     const problems: string[] = [];
     const stockTerms =
-      /\b(delve|foster|leverage|utilize|facilitate|empower|streamline|robust|cutting-edge|comprehensive|seamless|pivotal|crucial|tapestry|game-changer|revolutionary|transformative)\b/i;
+      /\b(delve|foster|leverage|utilize|facilitate|empower|streamline|robust|cutting-edge|comprehensive|seamless|pivotal|crucial|tapestry|game-changer|revolutionary|transformative|realm|beacon|multifaceted|meticulous|intricate|paramount|elevate|harness|ever-evolving)\b/i;
+    const stockPhrases =
+      /\b(at its core|the real question|what really matters|it(?:'s| is) worth noting|it is important to note|stands as|serves as|marks a pivotal|plays a vital role|underscores|highlights)\b/i;
     for (const file of proseFiles) {
       const lines = (await Bun.file(file).text()).split("\n");
       lines.forEach((line, index) => {
         if (/[—–]/.test(line)) problems.push(`${file}:${index + 1}: em or en dash`);
         if (stockTerms.test(line)) problems.push(`${file}:${index + 1}: stock term`);
+        if (stockPhrases.test(line)) problems.push(`${file}:${index + 1}: stock phrase`);
       });
     }
     expect(problems).toEqual([]);
@@ -34,10 +37,13 @@ describe("proposal prose", () => {
 
     const readme = await Bun.file("README.md").text();
     expect(readme).toContain("# PMVS: Prediction Market Vault Standard");
-    expect(readme).toContain("PMVS defines a tokenized vault that holds prediction-market shares");
-    expect(readme).toContain("PMVS calls them **outcome positions**");
-    expect(readme).toContain("The vault holds the prediction-market shares; the investor holds the vault share");
-    expect(readme).toContain("The vault is the full economic and custody perimeter");
+    expect(readme).toContain("PMVS specifies an ERC-20 vault that holds prediction-market shares");
+    expect(readme).toContain(
+      "PMVS calls the market shares **outcome positions** and the investor token the **vault share**",
+    );
+    expect(readme).toContain("Each vault share is a fungible, pro-rata unit of declared net asset value");
+    expect(readme).toContain("The custody perimeter includes every account whose cash");
+    expect(readme).toContain("ERC-20 defines balances, transfers, and allowances");
     expect(readme).toContain("Boring Vault architecture");
   });
 

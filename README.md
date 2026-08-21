@@ -2,30 +2,45 @@
 
 **Status:** pre-EIP review draft. **Author:** Ivan Morozov (Zeit Finance). **First published:** 2026-08-18. No EIP or ERC number has been assigned, and no official discussion thread has been opened.
 
-PMVS defines a tokenized vault that holds prediction-market shares, called outcome positions in this proposal. Its custody perimeter can also hold trading collateral, cash, and claims. Its NAV accounts for liabilities. Investors hold one fungible ERC-20 share of the whole vault. That share remains the same as the strategy enters new markets and old markets resolve.
+PMVS specifies an ERC-20 vault that holds prediction-market shares. PMVS calls the market shares **outcome positions** and the investor token the **vault share**. Each vault share is a fungible, pro-rata unit of declared net asset value (NAV). The share token remains the same while the strategy trades, merges, and redeems outcome positions.
 
-The standard covers the complete vault: share accounting, custody, valuation, asynchronous entry and exit, fees, settlement, migration, and closure. Signed records and on-chain commitments make those functions verifiable.
+The standard covers the whole vault: share accounting, custody, valuation, asynchronous entry and exit, fees, settlement, migration, and closure. Signed records and on-chain commitments make the relevant state and arithmetic checkable.
 
-PMVS is written for Ethereum and EVM chains. Venue, storage, valuation, anchor, and settlement details live in versioned profiles. This keeps the vault model portable across EVM chains and prediction-market venues. A non-EVM port needs its own identity, signature, and anchor rules.
+Core v1 targets Ethereum and EVM chains. Versioned profiles define venue, storage, valuation, anchor, and settlement details. A non-EVM port needs new identity, signature, and anchor rules.
 
-## The vault being standardized
+## Vault model
 
-A PMVS vault has two token layers:
+The portfolio and the investor use different tokens:
 
 | Layer | Holder | Meaning | Lifetime |
 |---|---|---|---|
-| Outcome position | Declared vault custody | A claim on one prediction-market outcome | Ends through sale, merge, or redemption |
-| Vault share | Investor | A proportional unit of the vault's net assets | Continues while the portfolio changes |
+| Outcome position | Vault custody | A claim on one prediction-market result | Leaves the portfolio through sale, merge, or redemption |
+| ERC-20 vault share | Investor | A pro-rata unit of declared vault NAV | Continues while the portfolio changes |
 
-Prediction-market shares are often ERC-1155 tokens, although a venue can define another representation through a profile. PMVS calls them **outcome positions** to distinguish them from the investor's ERC-20 vault share. Investors receive the ERC-20 share while the outcome positions remain in declared vault custody.
+Outcome positions are often ERC-1155 tokens, but a venue profile may define another form. The ERC-20 contract is the vault-share component. It may hold only a temporary accounting-asset buffer while a strategy wallet holds the outcome positions.
 
-The vault holds the prediction-market shares; the investor holds the vault share.
+The custody perimeter includes every account whose cash, outcome positions, receivables, claim reserves, or liabilities belong to the vault. Valuation includes the full perimeter. Moving an asset between declared custody accounts does not change NAV.
 
-The vault is the full economic and custody perimeter. The ERC-20 contract is one component and may hold only a temporary accounting-asset buffer. A separate strategy wallet may hold the outcome positions. Those positions remain part of vault NAV when the active component record identifies the custody account and the valuation method verifies its balances.
+## Why a vault standard is needed
 
-## A prediction-market extension of the Boring Vault pattern
+Each outcome position is tied to one market and one payout condition. The vault sells, merges, or redeems it before moving capital into another market. A managed strategy rotates through many such positions. Direct ownership would force each investor and integration to track changing ERC-1155 ids, market resolutions, and venue actions.
 
-The reference architecture follows the modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds): a small share vault delegates strategy actions to a Manager, deposits and withdrawals to a Teller, and price publication to an Accountant. PMVS keeps that separation and adds the parts required for prediction markets:
+The ERC-20 vault share gives the strategy one continuing funding unit. Investors subscribe and redeem in the accounting asset. Wallets, governance systems, and other protocols integrate one token while the vault changes its portfolio.
+
+ERC-20 defines balances, transfers, and allowances. It does not define the share's assets, NAV, entry price, exit price, fees, or recovery path. A prediction-market vault must answer:
+
+1. Which accounts, assets, claims, and liabilities belong to the vault?
+2. How are live, illiquid, and resolved outcome positions valued?
+3. Which NAV and price per share apply to each deposit or redemption?
+4. When may a request wait, be cancelled, or become claimable?
+5. How do fees affect price per share and total supply?
+6. How are pending requests, claims, shares, and residual assets handled during migration or closure?
+
+Demand, liquidity, and legal rights remain deployment-specific. Before accepting capital, a deployment must disclose its custody controls, request delays, fees, transfer restrictions, loss paths, and redemption rules.
+
+## Reference architecture
+
+PMVS extends the modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds): a small share vault delegates strategy actions to a Manager, asset movement and share issuance to a Teller, and price publication to an Accountant. Prediction-market vaults add:
 
 1. a declared custody perimeter for outcome positions and trading collateral;
 2. venue-aware inventory and valuation;
@@ -34,9 +49,7 @@ The reference architecture follows the modular [Boring Vault architecture](https
 5. rules for resolved, illiquid, or unavailable positions; and
 6. migration and closure rules for a share that can outlive its current contracts.
 
-The contracts may be modular or monolithic. Conformance tests the required behavior and declared interfaces regardless of contract names or code lineage.
-
-The reference contracts map to the standard as follows:
+The reference contracts map to those roles as follows:
 
 | Reference module | PMVS role |
 |---|---|
@@ -47,7 +60,7 @@ The reference contracts map to the standard as follows:
 | `EscrowAdapter` | Deposit and redemption queues, epoch control, aggregate settlement, Merkle commitments, and claims |
 | Strategy custody account | Working collateral and ERC-1155 outcome positions used by the strategy |
 
-This mapping is informative. Implementations can combine or rename modules while preserving the required roles and invariants.
+An implementation may combine or rename modules. Conformance depends on the declared roles, interfaces, and invariants.
 
 ```text
 investor
@@ -67,29 +80,6 @@ strategy custody  <------  strategy manager
    |-- live outcome positions
    `-- resolved claims and receivables
 ```
-
-## The problem
-
-An outcome position answers one market question. It is useful for trading that event, but it is a poor funding instrument for a strategy that moves from market to market. It expires economically when the position is sold or the market resolves.
-
-A vault share solves the continuity problem. Capital can remain represented by one ERC-20 while the strategy changes its underlying positions. Wallets, accounting systems, governance contracts, and other protocols can integrate that stable share without tracking every outcome position.
-
-The ERC-20 interface alone does not give the share a reliable economic meaning. A prediction-market vault must still answer:
-
-1. Which custody accounts and positions belong to the vault?
-2. How are live, illiquid, and resolved positions valued?
-3. Which price applies when an investor enters or exits?
-4. When can a request wait, be cancelled, or become claimable?
-5. How do fees change price per share and total supply?
-6. What happens to pending requests and outstanding shares during migration or closure?
-
-PMVS gives each answer a common, testable form.
-
-## Why the ERC-20 share matters for funding
-
-One outcome position represents exposure to one result. One vault share can fund a continuing strategy across many markets. An investor can subscribe in the accounting asset, hold one fungible token, and redeem into the accounting asset after the vault settles the request.
-
-That structure gives a managed prediction-market strategy one continuing funding instrument and one integration surface. Demand, liquidity, and legal rights remain deployment-specific. Before accepting capital, a deployment must state its custody controls, request delays, fee terms, transfer restrictions, loss paths, and redemption rules.
 
 ## Vault lifecycle
 
@@ -116,24 +106,24 @@ The strategy manager can direct the custody component to buy, sell, merge, and r
 4. Settlement burns the accepted shares and funds the asset claims.
 5. The investor claims the accounting asset.
 
-## What PMVS standardizes
+## Normative scope
 
-PMVS has four layers:
+| Area | Required rules |
+|---|---|
+| Vault | Share meaning, accounting asset, custody perimeter, component roles, authorities, migration, and closure |
+| Settlement | Request states, epoch transitions, prices, fees, aggregate mint and burn, claim funding, cancellation, and retirement |
+| Valuation | Outcome-position inventory, resolution, order-book capture, illiquidity, liabilities, NAV, and price per share |
+| Verification | Canonical records, signatures, on-chain anchors, venue and storage profiles, and deterministic replay |
 
-1. **Vault model.** The durable share, accounting asset, custody perimeter, component roles, authorities, lifecycle, migration, and closure rules.
-2. **Asynchronous settlement.** Request states, epoch transitions, pricing, fees, aggregate mint and burn operations, claim funding, Merkle commitments, cancellation, and retirement.
-3. **Prediction-market valuation.** Outcome-position inventory, resolution, order-book capture, illiquidity policy, liabilities, NAV, and price per share.
-4. **Records and profiles.** Canonical records, signatures, on-chain anchors, venue bindings, storage bindings, and deterministic verification.
-
-The core does not hard-code Polygon, Polymarket, Arweave, one custodian, or one contract suite. Those choices belong in component records and profiles.
+The core does not select a chain deployment, venue, storage network, custodian, or contract suite. Component records and profiles make those choices explicit.
 
 ## Trust boundaries
 
-PMVS can establish three different results:
-
-- **Commitment integrity:** the named authority signed specific bytes, the chain committed their hash, and settlement matches the committed allocation.
-- **Deterministic reproduction:** another implementation gets the same NAV, price, fees, and claim amounts from the published inputs.
-- **Outside corroboration:** independent observers may compare their venue observations with the operator's capture.
+| Result | Meaning |
+|---|---|
+| Commitment integrity | The named authority signed specific bytes, the chain committed their hash, and settlement matches the committed allocation. |
+| Deterministic reproduction | Another implementation gets the same NAV, price, fees, and claim amounts from the published inputs. |
+| Outside corroboration | Independent observers compare their venue observations with the operator's capture. |
 
 The first two results can expose inconsistent accounting. They cannot prove that an unsigned venue response was true. Displayed orders can disappear before execution. Version 1 has no challenge period, fraud proof, bond, or veto.
 

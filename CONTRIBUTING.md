@@ -1,6 +1,6 @@
 # Contributing to PMVS
 
-PMVS defines a prediction-market vault whose ERC-20 share depends on position inventory, NAV, and asynchronous settlement. A vague sentence, stale address, or changed rounding rule can alter what a share represents or who receives value. Treat normative edits as protocol changes, not copy edits.
+PMVS specifies how an ERC-20 vault share maps to prediction-market inventory, NAV, and asynchronous settlement. A vague sentence, stale address, or changed rounding rule can alter what the share means or who receives value. Treat normative edits as protocol changes, not copy edits.
 
 ## Change classes
 
