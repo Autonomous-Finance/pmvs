@@ -24,6 +24,23 @@ describe("proposal prose", () => {
     expect(problems).toEqual([]);
   });
 
+  test("keeps the proposal framed as a vault standard", async () => {
+    const text = (await Promise.all(proseFiles.map((file) => Bun.file(file).text()))).join("\n");
+    expect(text).not.toMatch(
+      /\bzeit(?:-(?:mono|epoch|legacy)|\s+(?:monorepo|contracts?|deployment|abi|archive|implementation))\b/i,
+    );
+    expect(text).not.toMatch(/\baudit(?:ing)?(?:\s+and\s+settlement)?\s+standard\b/i);
+    expect(text).not.toContain("PMVS is an evidence standard");
+
+    const readme = await Bun.file("README.md").text();
+    expect(readme).toContain("# PMVS: Prediction Market Vault Standard");
+    expect(readme).toContain("PMVS defines a tokenized vault that holds prediction-market shares");
+    expect(readme).toContain("PMVS calls them **outcome positions**");
+    expect(readme).toContain("The vault holds the prediction-market shares; the investor holds the vault share");
+    expect(readme).toContain("The vault is the full economic and custody perimeter");
+    expect(readme).toContain("Boring Vault architecture");
+  });
+
   test("resolves every relative Markdown link", async () => {
     const missing: string[] = [];
     const linkPattern = /\[[^\]]*\]\(([^)]+)\)/g;

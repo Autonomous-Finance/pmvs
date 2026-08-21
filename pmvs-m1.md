@@ -13,9 +13,11 @@ RFC 2119 / RFC 8174 keywords as in Part I.
 
 ## Abstract
 
-PMVS-M1 computes net asset value and price per share from controlled cash, explicit liabilities, and prediction-market positions. It has two stages. Capture obtains chain and venue data and pins every input. Compute uses only those inputs, integer arithmetic, and declared parameters. An independent implementation can then reproduce the output.
+PMVS-M1 turns a changing portfolio of prediction-market outcome positions into the accounting value behind one durable ERC-20 vault share. It computes net asset value and price per share from controlled cash, explicit liabilities, and every outcome position in the declared custody perimeter.
 
-M1 is a conservative displayed-liquidity method. It is not fair value, liquidation value, or a promise of execution. A material position that cannot be priced under its depth and illiquidity rules blocks settlement rather than transferring the uncertainty between entering and exiting share holders.
+The method has two stages. Capture obtains chain and venue data and pins every input. Compute uses only those inputs, integer arithmetic, and declared parameters. An independent implementation can then reproduce the output.
+
+M1 is a conservative displayed-liquidity method. It is not fair value, liquidation value, or a promise of execution. A material position that cannot be priced under its depth and illiquidity rules blocks settlement rather than transferring the uncertainty between entering and exiting vault-share holders.
 
 ```
 capture: operator and outside systems      compute: pure and repeatable
@@ -27,6 +29,21 @@ capture timing and failures      --->      deterministic ordered output
 ```
 
 Valuation names its price concepts precisely. A resting order book is unsigned and cancellable. Crossing it in simulation yields gross cross proceeds. The venue profile then subtracts a deterministic upper bound on execution charges to produce the **displayed-book cross mark**. That mark is not a guaranteed exit value.
+
+## Role in the vault standard
+
+The share-vault contract may hold only a temporary accounting-asset buffer while a separate strategy-custody account holds the outcome positions. M1 values the whole subject, not one contract balance.
+
+For each valuation, M1:
+
+1. reconstructs the complete position inventory for every declared custody account;
+2. reads cash, claim reserves, liabilities, and share supply at pinned blocks;
+3. marks live positions from captured executable bids and resolved positions from on-chain payout state;
+4. converts every amount into the accounting asset;
+5. computes NAV and gross price per share; and
+6. supplies that price to the settlement profile for deposits, redemptions, and fees.
+
+Outcome positions remain portfolio assets. M1 does not wrap each position into a new ERC-20 and does not distribute those positions to vault-share holders.
 
 ## Marks
 
@@ -122,7 +139,7 @@ The single largest failure mode of venue-priced NAV is a silently incomplete pos
 
 ## Illiquidity policy
 
-Illiquid positions can shift value between depositor and redeemer cohorts. M1 therefore treats depth failure as a settlement gate, not only a reporting detail.
+Illiquid positions can shift value between depositor and redeemer cohorts. M1 therefore makes a depth failure block settlement.
 
 1. `grossMark` MUST NOT exceed the position's maximum on-chain payout, and `mark` MUST NOT exceed `grossMark`. A book with invalid prices or quantities is `DATA_UNAVAILABLE`.
 2. Each position records filled size, unfilled size, unfilled maximum payout, and those amounts as a share of the declared materiality reference. The record also reports aggregate unfilled exposure.
@@ -147,7 +164,7 @@ A reproducible valuation needs a still target. At the declared capture boundary:
 ## Cash perimeter
 
 1. `cashValue` starts with every declared collateral balance at every subject-controlled address: external custody, vault buffers, request escrow, claim funding, and fee custody. Each balance is read at its pinned block and normalized to accounting-asset base units. Moving cash inside this perimeter MUST NOT change NAV.
-2. Exclusions and liabilities are separate labeled lines. They include unminted deposit escrow, committed withdrawal claims, manager-claimable fees, debt, operating obligations, and any cash not owned by share holders. The same balance cannot appear as both a share asset and claim funding.
+2. Exclusions and liabilities are separate labeled lines. They include unminted deposit escrow, committed withdrawal claims, manager-claimable fees, debt, operating obligations, and any cash that does not belong to vault-share holders. The same balance cannot appear as both a share asset and claim funding.
 3. For multiple collateral tokens, the profile declares an exact conversion source, scale, rounding rule, staleness bound, and depeg response. A fixed 1:1 rule is allowed only as an explicit risk assumption. Listing a depeg without changing the conversion is not risk control.
 4. Off-venue and cross-chain positions enter as `overlayValue` with pinned blocks, finality rules, ownership checks, liabilities, and exact conversion functions. A bridge asset and its in-flight canonical claim MUST NOT both be counted.
 
@@ -211,41 +228,19 @@ A pre-settlement valuation has an epoch and `slot: null`. An L3 periodic valuati
 
 This checks chain facts against the canonical chain and proves arithmetic relative to recorded inputs. Venue-input truth is corroborated at best.
 
-## Precursor implementation and migration gaps
-
-The precursor engine computes a reference mark and a book-cross mark. Its implementation is not part of this repository. These gaps describe migration work and do not grant conformance to old records.
-
-| # | Precursor behavior (verified in source) | M1 requirement | Status |
-|---|---|---|---|
-| M1 | Redeemable positions used whole-currency floating-point floors | On-chain payout state and one base-unit floor | safety defect closed 2026-08-18; PMVS records remain open work |
-| M2 | Zero NAV was decided before redemption and persisted across resume | Recompute from post-redemption state on every attempt | safety defect closed 2026-08-18 with resume-matrix tests |
-| M3 | One empty book could write a position to zero at any size | Persistent observations plus per-position and aggregate caps | partially closed 2026-08-18; the implementation uses a second read and fixed caps, while M1 record-carried windows remain open |
-| M4 | API failure could become an empty position list | Fail with `DATA_UNAVAILABLE` | safety defect closed 2026-08-18; strict fetch errors now stop NAV paths |
-| M5 | Position sizes and inventory come from the venue Data API only (with a server-side dust threshold); no transfer-log reconstruction, no `balanceOfBatch` | Chain-derived inventory and quantities | open |
-| M6 | Cross-mark accumulation in IEEE-754 floats with one late floor; per-position and total figures need not agree | Integer-only, single floor per position, sum consistency | open (the redemption branch is now integer; the cross path still floats) |
-| M7 | Wall-clock reads inside valuation (aging logic defaults to now); in-process caches and retry jitter affect results | Pure compute over recorded time | open (`nowMs` is injectable but defaults to the clock) |
-| M8 | Chain reads at `latest`; no block numbers or hashes recorded anywhere | Pinned reads | open |
-| M9 | Books: only aggregate proceeds retained; venue correlation fields (book hash, timestamp, tick size) parsed then discarded; no raw-response preservation | Venue-profile capture rules | open |
-| M10 | Periodic figures go to an operator database that is publicly readable but privileged-mutable (backfill jobs update historical rows); no published records, no slots, no gap discipline | Published, chained, slot-stamped records | open |
-| M11 | An off-chain yield overlay is added outside the engine after NAV, from unpinned reads on another chain | Overlay as a pinned recorded input | open |
-| M12 | Engine parameters are constants in code, not carried in records; no methodology or engine identity surfaced | Parameterization in the hashed region | open (the thresholds are now named exported constants, still not record-carried) |
-| M13 | Book-cross proceeds ignore venue execution fees | Subtract the named venue profile's pinned execution-cost cap | open |
-
-Open rows prevent an L2 or L3 claim. This table does not assess the full safety of the precursor deployment.
-
 ## Rationale
 
 - **Chain-derived inventory.** ERC-1155 does not require token-id enumeration. Transfer logs establish the candidate id set, and pinned balance calls establish quantities. An operator list alone cannot show that nothing was omitted.
 - **Displayed-book cross mark.** A resting order can disappear before execution. M1 names the exact calculation, including a venue-cost cap, without implying a fill.
 - **Capture and compute.** Clocks, retries, source changes, and network failures stay in capture. Compute receives fixed inputs and has one answer.
-- **Two-sided caution.** An invented fallback can inflate NAV. An easy write-off can depress it. Either direction transfers value between share-holder cohorts.
+- **Two-sided caution.** An invented fallback can inflate NAV. An easy write-off can depress it. Either direction transfers value between cohorts of vault-share holders.
 
 ## Security considerations
 
 - A venue or trader can place and cancel bids to influence a capture. Quiescence and watchers reduce some uncertainty but do not authenticate the book.
 - A fee-capped mark can still be unfair if deposits or withdrawals proceed while material unfilled exposure remains. The settlement gate is therefore part of the method.
 - A venue can change its fee cap after capture. The same pinned value must govern valuation and settlement, or the record is rebuilt. A profile with an unlimited fee setting cannot produce an M1 cross mark.
-- Missing liabilities inflate NAV just as missing positions can depress it. Verifiers check the entire perimeter and claim funding, not only venue inventory.
+- Missing liabilities inflate NAV just as missing positions can depress it. Verifiers check the entire custody perimeter, including claim funding and venue inventory.
 - Cross-chain overlays can be counted twice during bridge transit or reorged after a short confirmation window. Each overlay declares finality and mutually exclusive ownership states.
 - A source API can change types or decimal precision without changing its endpoint. The venue profile pins accepted shapes and fails on unknown forms.
 

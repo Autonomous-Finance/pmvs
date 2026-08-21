@@ -12,8 +12,8 @@ import {
   attestationDigest,
   bpsExitCostCap,
   canonicalize,
-  legacyLeaf,
-  legacyRoot,
+  compatibilityLeaf,
+  compatibilityRoot,
   netPps,
   performanceFeeShares,
   pmvsMerkleLeaf,
@@ -63,7 +63,7 @@ describe("PMVS-JCS/1", () => {
 describe("machine schema", () => {
   test("accepts the signed component-genesis fixture", async () => {
     const hash = recordHash(componentRecord);
-    expect(hash).toBe("0x6c7f5186cde84439db366e139deb853565417469af140e11224f1d480238e19a");
+    expect(hash).toBe("0x7286a7285e98763ab158993d6f27a7f349b6b47f12b31b76aba9215884aef014");
     const account = privateKeyToAccount(`0x${"1".padStart(64, "0")}`);
     const signature = await account.signTypedData({
       domain: {
@@ -95,7 +95,7 @@ describe("machine schema", () => {
       },
     });
     expect(signature).toBe(
-      "0x7a2241cf28d675c5bea5a76eef0f6c2395a38879a946ec802d8ea8469efb93197e226a7441ffbfaaf03762ff7c67b6c225f6e053d5af91a575d003e5b632b53c1c",
+      "0xbe78c672d973341d973978a75e3e4da3283d43f28fd1d9e2672171f17fbe6be8009de37ab0fd22c7ddd070713a05d5ca2366287ff558db582bbf7495d47a07551b",
     );
     const envelope = {
       record: componentRecord,
@@ -113,6 +113,39 @@ describe("machine schema", () => {
     const validate = new Ajv2020({ strict: true, allErrors: true }).compile(envelopeSchema);
     expect(validate(envelope), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({ ...envelope, undeclared: true })).toBe(false);
+
+    const { portfolio: _, ...recordWithoutPortfolio } = componentRecord;
+    expect(validate({ ...envelope, record: recordWithoutPortfolio })).toBe(false);
+    expect(
+      validate({
+        ...envelope,
+        record: { ...componentRecord, portfolio: { ...componentRecord.portfolio, kind: "generic-vault" } },
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...envelope,
+        record: { ...componentRecord, share: { ...componentRecord.share, economicUnit: "outcome-claim" } },
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...envelope,
+        record: {
+          ...componentRecord,
+          contracts: componentRecord.contracts.filter((component) => component.role !== "strategy-manager"),
+        },
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...envelope,
+        record: {
+          ...componentRecord,
+          contracts: componentRecord.contracts.filter((component) => component.role !== "strategy-custody"),
+        },
+      }),
+    ).toBe(false);
   });
 
   test("requires gross mark and venue exit cost in valuation outputs", () => {
@@ -254,9 +287,9 @@ describe("identity and attestation", () => {
   });
 });
 
-describe("legacy Zeit commitments", () => {
+describe("compatibility Merkle commitments", () => {
   const leaves = owners.map((owner, index) =>
-    legacyLeaf({ requestId: BigInt(index + 1), owner, amount: amounts[index], epoch: 7n }),
+    compatibilityLeaf({ requestId: BigInt(index + 1), owner, amount: amounts[index], epoch: 7n }),
   );
 
   test("matches all leaf and root vectors", () => {
@@ -266,7 +299,7 @@ describe("legacy Zeit commitments", () => {
       "0xdda630ba305851387c6b9c87d0c2494379125fc352f910dbb9fdc38d072c265e",
       "0x5928010a4f0e5614fb61395f269bbc8944e6fbf5691c2b87629df799097601a7",
     ]);
-    expect([0, 1, 2, 3, 4].map((count) => legacyRoot(leaves.slice(0, count)))).toEqual([
+    expect([0, 1, 2, 3, 4].map((count) => compatibilityRoot(leaves.slice(0, count)))).toEqual([
       ZERO_HASH,
       leaves[0],
       "0x878e7da2f65f70b23b49f40f32411a8e23f01e56a421dabedb8d464dd545953d",

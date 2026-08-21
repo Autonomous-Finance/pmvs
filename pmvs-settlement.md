@@ -1,4 +1,4 @@
-# PMVS Part II. Settlement evidence and epoch-Merkle profile
+# PMVS Part II. Asynchronous vault settlement and epoch-Merkle profile
 
 ```
 pmvs-part:      settlement
@@ -13,13 +13,15 @@ RFC 2119 / RFC 8174 keywords as in Part I.
 
 ## Abstract
 
-This Part defines the evidence needed to audit an asynchronous vault settlement. It also defines `settlement/zeit-epoch-merkle/1`, the concrete request, Merkle, pricing, and fee profile that motivated PMVS. The profile computes user amounts off-chain and commits them on-chain. A verifier rebuilds those commitments and compares them with requests, pricing inputs, and transaction results.
+This Part defines how a PMVS vault accepts accounting assets, issues ERC-20 vault shares, accepts shares for redemption, and returns the accounting asset after asynchronous settlement. Outcome positions remain inside the declared strategy-custody perimeter. Investors do not receive those positions during normal entry or exit.
 
-PMVS is an evidence standard. It does not require every vault to expose the Zeit interface. Another settlement system conforms through a versioned profile that maps its request states, accounting, events, and claim path to the common evidence requirements in this Part.
+This Part also defines `settlement/epoch-merkle/1`. The profile adds an epoch request and claim layer to a modular share vault, Teller, and Accountant. It computes user amounts off-chain, mints or burns aggregate shares, funds aggregate claims, and commits each allocation on-chain with Merkle roots.
+
+PMVS is a vault standard. The epoch-Merkle design is one settlement profile. Another settlement system can define a versioned profile that maps its request states, accounting, events, funding, and claim path to the common requirements in this Part.
 
 ## Economic meaning of the share
 
-The ERC-20 share is the long-lived funding unit. Outcome positions may resolve, merge, or leave the portfolio while the share continues. For that share to carry a checkable economic meaning, a settlement profile MUST state:
+The ERC-20 share is the long-lived funding unit for the whole prediction-market vault. Outcome positions may resolve, merge, or leave the portfolio while the share continues. A settlement profile MUST state:
 
 1. which assets or rights an accepted deposit receives;
 2. when shares are minted and burned;
@@ -30,6 +32,24 @@ The ERC-20 share is the long-lived funding unit. Outcome positions may resolve, 
 7. what happens to residual assets, liabilities, pending requests, and outstanding shares at migration or closure.
 
 An ERC-20 balance is not a promise of immediate liquidity. The component record and user interface MUST state request delays, cancellation rules, fees, transfer restrictions, valuation dependence, custody assumptions, and known loss paths. PMVS conformance is not an investment recommendation.
+
+## Modular settlement architecture
+
+The epoch-Merkle profile follows the component split in Part I:
+
+| Component | Settlement responsibility |
+|---|---|
+| Share vault | Implements the ERC-20 share and holds any temporary accounting-asset buffer |
+| Strategy custody | Holds working collateral and prediction-market outcome positions |
+| Accountant | Publishes the gross price per share once for the frozen epoch |
+| Fee module | Converts gross price into final price and accounts for manager fees |
+| Teller | Mints deposit shares, burns redemption shares, and transfers the accounting asset |
+| Strategy manager | Raises accounting assets from the position portfolio and controls transfers to or from strategy custody |
+| Request adapter | Escrows requests, freezes epochs, commits allocations, funds claims, and verifies claim proofs |
+
+The strategy custody component sells or redeems positions when the vault needs accounting assets for withdrawals. Exiting investors receive the declared accounting asset under the settled price and rounding rules. The ERC-1155 outcome positions remain in vault custody.
+
+This profile extends the modular Boring Vault pattern with asynchronous request states and Merkle claims. It does not require the share-vault contract itself to custody every portfolio position.
 
 ## Common settlement evidence
 
@@ -54,7 +74,7 @@ ERC-4626 defines synchronous tokenized-vault entry, exit, estimates, and preview
 
 New asynchronous settlement profiles SHOULD use the ERC-7540 request model and ERC-165 detection where their accounting can meet the standard. PMVS then adds evidence for external valuation and allocation. A custom request interface is allowed under its own profile, but it MUST NOT be labeled ERC-7540 by analogy.
 
-## Profile `settlement/zeit-epoch-merkle/1`
+## Profile `settlement/epoch-merkle/1`
 
 Users enqueue deposits or withdrawals and escrow the input. The settlement authority freezes an epoch, computes outputs, publishes an archive, and submits one roll. The roll marks selected requests, processes fees, mints or burns aggregate shares, and commits two Merkle roots. Owners later claim with proofs. Roll cost does not grow with the request count; each claimant supplies its own proof.
 
@@ -122,10 +142,13 @@ function ROLL_SETTLEMENT_VERSION() external view returns (uint64);
 
 event DepositSelection (uint64 indexed epoch, bytes32 selectionHash);
 event WithdrawSelection(uint64 indexed epoch, bytes32 selectionHash);
-event DepositRollCommitted (uint64 indexed epoch, bytes32 merkleRoot, uint256 totalAssets, uint256 totalShares, string dataURI);
-event WithdrawRollCommitted(uint64 indexed epoch, bytes32 merkleRoot, uint256 totalShares, uint256 totalAssets, string dataURI);
+event DepositRollCommitted (uint64 indexed epoch, bytes32 merkleRoot, uint256 leafCount, uint256 totalAssets, uint256 totalShares, string dataURI);
+event WithdrawRollCommitted(uint64 indexed epoch, bytes32 merkleRoot, uint256 leafCount, uint256 totalShares, uint256 totalAssets, string dataURI);
 event VaultRetired(uint8 reason);              // 0 = withdraw-leg supply exhaustion, 1 = zero-NAV
 event FinalRollAssetFeeAccrued(uint64 indexed epoch, uint256 ppsGross, uint256 ppsFinal, uint256 feeAssets);
+
+function depositLeafCount(uint64 epoch) external view returns (uint256);
+function withdrawLeafCount(uint64 epoch) external view returns (uint256);
 ```
 
 Sequencing invariants (all revert):
@@ -134,8 +157,9 @@ Sequencing invariants (all revert):
 2. Selection marking: every listed request id must exist, be uncancelled, and not already be selected. The request's queued epoch must satisfy `request.epoch <= epoch`: requests queued in earlier epochs MAY be settled later (carried forward), and requests from later epochs MUST NOT settle early. Marked requests record `solvedAt = block.timestamp`.
 3. `selectionHash = keccak256(abi.encode(requestIds))`: the ABI encoding of the `uint256[]` ordered list (offset word, length word, items). Vectors: `[1,2,3]` gives `0x62e243217b24f0adeab63b697d9c38d64bd4cbf540c9915772ddc377b45b411c`; `[]` gives `0x569e75fc77c1a856f6daaf9e69d8a9566ca34aa47f9133711ce065a571af0cfd`.
 4. A non-empty leg (`requestIds.length > 0`) with a zero Merkle root reverts. A non-empty leg with both totals zero reverts.
-5. **Empty-leg check.** The precursor contract checks shapes only for non-empty legs. An empty `requestIds` array with non-zero totals can mint unclaimable shares or burn escrowed shares. Archive conservation makes the defect visible but does not prevent loss. New deployments using this profile MUST revert unless an empty leg has a zero root and zero totals.
-6. `ROLL_SETTLEMENT_VERSION` introspection is REQUIRED on new deployments. For legacy contracts without the getter, callers MUST infer version 1 only from a positively identified missing selector (empty revert data or zero-length return) on fingerprinted bytecode (runtime code hash listed in the component-generation record). Transport errors, timeouts, and unknown bytecode MUST NOT be read as version 1: misclassification misprices withdrawal claims.
+5. **Empty-leg check.** An empty `requestIds` array with nonzero totals can mint unclaimable shares or burn escrowed shares. The contract MUST revert unless an empty leg has a zero root and zero totals. Archive conservation can expose the defect but cannot prevent the transaction loss.
+6. For each leg, the contract derives `leafCount` from `requestIds.length`, stores it with the root, and emits it. The root MUST be the `pmvs-merkle/1` count-bound root for that count.
+7. `ROLL_SETTLEMENT_VERSION` introspection is REQUIRED on new deployments. For compatibility contracts without the getter, callers MUST infer version 1 only from a positively identified missing selector (empty revert data or zero-length return) on fingerprinted bytecode listed in the component-generation record. Transport errors, timeouts, and unknown bytecode MUST NOT be read as version 1 because misclassification changes withdrawal prices.
 
 #### Claims
 
@@ -156,7 +180,7 @@ event WithdrawClaimProcessed(uint64 indexed epoch, uint256 indexed requestId, ad
 2. Per-claim checks: owner match; not cancelled; marked solved; not already claimed. Claimed-state is per request id; the storage is a packed bitmap, and the normative surface is the per-id getters above. The claim's `epoch` selects the committed roll data (a zero root means uncommitted, so revert), and the recomputed leaf must verify against the root.
 3. The leaf's `epoch` field is the settlement (solved) epoch, which for carried-forward requests differs from the queued epoch.
 4. The contract can accept a zero-amount withdrawal leaf, but a conforming archive MUST NOT create one. Batch deposit claims revert if the batch nets zero shares.
-5. The deployed precursor has no timeout, forced exit, or rescue path after selection. An omitted or bad leaf can strand the owner. PMVS makes that state visible; it does not recover funds. Verifiers MUST reconstruct the pending set from queue, cancellation, selection, commitment, and claim events and report repeated carry-forward or an expired claim remedy.
+5. A deployment with no timeout, forced exit, or rescue path after selection is `operator-dependent`. An omitted or bad leaf can strand the owner. Verifiers MUST reconstruct the pending set from queue, cancellation, selection, commitment, and claim events and report repeated carry-forward or an expired claim remedy.
 
 #### Liveness classification
 
@@ -181,7 +205,9 @@ Replay protection is strict sequential per-investor nonces (`provided == expecte
 
 ### Merkle commitment encoding
 
-#### Leaf (legacy profile `zeit-leaf/1`, the deployed encoding)
+#### Compatibility leaf profile `settlement/epoch-merkle-compat/0`
+
+This encoding is retained only so a verifier can read older epoch-Merkle contracts. A new deployment MUST NOT use it for a production PMVS conformance claim because it does not bind the chain, settlement contract, leg, or leaf count. The normative leaf for `settlement/epoch-merkle/1` is `pmvs-merkle/1` below.
 
 ```
 leaf = keccak256( be(requestId, 32) ‖ owner(20) ‖ be(amount, 32) ‖ be(settlementEpoch, 8) )
@@ -232,12 +258,12 @@ n=4: root = 0xa41524fd008f5c3eba4ffbd27870441729f6a92713ee620a2da01dc855136092
      proof[3] = [leaf[3], 0x878e7da2f65f70b23b49f40f32411a8e23f01e56a421dabedb8d464dd545953d]
 ```
 
-Security properties of `zeit-leaf/1`:
+Security properties of `settlement/epoch-merkle-compat/0`:
 
 - **Count ambiguity.** Odd-node duplication makes `root([A,B,C]) == root([A,B,C,C])` (vector: the n=3 root above equals the root of `[leaf1, leaf2, leaf3, leaf3]`). The root therefore does not bind leaf count or multiplicity. Double payment is excluded by the per-request claimed state, not by the tree: request ids are unique and claimable once.
-- **Leaf/node separation.** The 92-byte leaf preimage is structurally distinct from the 64-byte interior-node preimage. The second-preimage argument rests on Keccak-256 and this length difference, not on a semantic domain tag. There is no chain-id, contract, leg, or standard-version tag inside the deployed leaf.
+- **Leaf/node separation.** The 92-byte compatibility leaf preimage is structurally distinct from the 64-byte interior-node preimage. The second-preimage argument rests on Keccak-256 and this length difference, not on a semantic domain tag. There is no chain id, contract, leg, or standard-version tag inside this leaf.
 
-New contracts SHOULD instead use `pmvs-merkle/1`, which binds the chain, settlement contract, leg, and leaf count:
+New contracts claiming `settlement/epoch-merkle/1` MUST use `pmvs-merkle/1`, which binds the chain, settlement contract, leg, and leaf count:
 
 ```
 tag  = keccak256(utf8("PMVS:MERKLE:1"))
@@ -251,7 +277,7 @@ root = count == 0
     : keccak256(0x02 || be(count, 32) || rawTreeRoot)
 ```
 
-`leg` is `0` for deposit and `1` for withdrawal. Odd nodes are still paired with themselves. A claim first reconstructs `rawTreeRoot`, then wraps it with the committed `count`. The contract stores both count and root. A proof with the wrong count fails. This profile is not compatible with the deployed Zeit verifier and therefore requires a new settlement-profile identifier and contract code.
+`leg` is `0` for deposit and `1` for withdrawal. Odd nodes are still paired with themselves. A claim first reconstructs `rawTreeRoot`, then wraps it with the committed `count`. The contract stores both count and root. A proof with the wrong count fails. A compatibility contract cannot switch to this encoding under its old identifier. It must use a new settlement contract or versioned claim entry point and preserve all pending requests during migration.
 
 Vector parameters: chain id 137, settlement contract `0x0000000000000000000000000000000000000001`, deposit leg, epoch 7, and the four `(id, owner, amount)` fixtures above. `tag = 0x71df0d2930a2279d0a8f0e38b7a9f5ceadeed5d0b250f4eaf38541b6fd7bf8ed`.
 
@@ -273,11 +299,11 @@ For each leg, the archive's claim list, the transaction's `requestIds`, and the 
 
 #### The 2^53 hazard
 
-Request ids and epochs are `uint256` and `uint64`. Tooling that routes ids through IEEE-754 doubles corrupts them: `Number(9007199254740993) == 9007199254740992`. Archives MUST carry ids as decimal strings (PMVS-JCS). The precursor archive builder converts ids through JS numbers; since 2026-08-18 every such conversion is guarded and throws on any id at or above 2^53 instead of corrupting silently (gap G7), though the wire format itself still awaits the decimal-string migration.
+Request ids and epochs are `uint256` and `uint64`. Tooling that routes ids through IEEE-754 doubles corrupts them: `Number(9007199254740993) == 9007199254740992`. Archives MUST carry ids as decimal strings under PMVS-JCS. A producer MUST reject any path that converts them through a host-language number.
 
 ### Settlement computation
 
-All arithmetic is unsigned integer math. `floor` and `ceil` state division rounding. This profile requires accounting-asset decimals `0 <= D <= 18`, sets `WAD = 10^18`, and sets `BRIDGE = 10^(18-D)`. The precursor uses `D = 6`, so `BRIDGE = 10^12`. `gross`, `hwm`, and `r` are `uint256`, with `0 <= r <= WAD`. Implementations MUST use checked full-precision multiplication and division. An intermediate overflow is not a rounding rule.
+All arithmetic is unsigned integer math. `floor` and `ceil` state division rounding. This profile requires accounting-asset decimals `0 <= D <= 18`, sets `WAD = 10^18`, and sets `BRIDGE = 10^(18-D)`. For a 6-decimal accounting asset, `BRIDGE = 10^12`. `gross`, `hwm`, and `r` are `uint256`, with `0 <= r <= WAD`. Implementations MUST use checked full-precision multiplication and division. An intermediate overflow is not a rounding rule.
 
 #### Gross and net price per share
 
@@ -294,7 +320,7 @@ netPps(gross, hwm, r):
 Version semantics (`ROLL_SETTLEMENT_VERSION`):
 
 - **Version 2, normative for new deployments.** The performance fee is processed on the pre-flow supply, before this roll's deposit mint and withdrawal burn, and both legs settle at `netPps`: deposit shares and withdrawal assets are priced post-fee, so NAV divided by total supply lands on the next epoch's start rate.
-- **Version 1, historical.** Fees on the post-deposit supply; both legs settle at `gross`. Documented for verifying legacy history only. New deployments MUST NOT implement version 1.
+- **Version 1, compatibility only.** Fees apply to the post-deposit supply, and both legs settle at `gross`. New deployments MUST NOT implement version 1.
 
 #### Performance-fee share mint (non-final rolls)
 
@@ -333,7 +359,7 @@ headroom  = max(vaultAssetBalance − withdrawTotalAssets, 0)
 feeAssets = min(candidate, headroom)
 ```
 
-`feeAssets` is pulled alongside the withdrawal assets, accrued to the manager, and `FinalRollAssetFeeAccrued(epoch, gross, ppsFinal, feeAssets)` is emitted. The crystallization flag blocks the legacy asset-fee relay from charging twice. The headroom cap exists because the prefund is sized from per-request floors while the fee is an aggregate floor: rounding dust stays with the claims, and dust can never revert a final roll.
+`feeAssets` is pulled alongside the withdrawal assets, accrued to the manager, and `FinalRollAssetFeeAccrued(epoch, gross, ppsFinal, feeAssets)` is emitted. The crystallization flag blocks a separate asset-fee relay from charging twice. The headroom cap exists because the prefund is sized from per-request floors while the fee is an aggregate floor: rounding dust stays with the claims, and dust can never revert a final roll.
 
 Vector: `withdrawShares=500e18, gross=1.2e18, hwm=1.0e18, r=0.2e18` gives `ppsFinal=1.16e18` and `candidate=20000000` (20 asset units at D=6). With `vaultAssets = withdrawTotalAssets + candidate − 7`, `feeAssets = candidate − 7`.
 
@@ -386,11 +412,11 @@ One archive per roll, published as a Part I record (`kind: "settlement-archive"`
   "context": { "stream": "subject", "kind": "settlement-archive", "sequence": "…",
                "prev": "0x…", "producedAt": "…", "epoch": "…" },
   "settlement": {
-    "settlementProfile": "settlement/zeit-epoch-merkle/1",
+    "settlementProfile": "settlement/epoch-merkle/1",
     "settlementVersion": "2",
     "grossPps": "…", "ppsFinal": "…", "highWaterMark": "…", "feeRate": "…",
     "valuationRecord": "0x…",           // recordHash of the pre-roll valuation record (L2; "0x00…00" at L1)
-    "merkleProfile": "zeit-leaf/1",
+    "merkleProfile": "pmvs-merkle/1",
     "requestLiveness": "operator-dependent"
   },
   "deposit": {
@@ -413,8 +439,6 @@ One archive per roll, published as a Part I record (`kind: "settlement-archive"`
 
 Empty legs use `requestIds: []`, a zero root, zero totals, and `claims: []`; they never use `null`. A claim client submits the committed post-rounding amount. A verifier re-derives that amount and reports any difference. The schema is closed under Part I's extension rule. The `excluded` list makes non-selection reasons checkable. The archive never relies on filenames, tags, or database ids.
 
-**Legacy shape.** The precursor uploads a pre-standard payload (`Zeit-Legacy-Archive/0`, informative): a root-level database `vaultId` (a UUID), no chain id, adapter, schema version, settlement version, or net PPS, JSON-number request ids and epochs (the 2^53 hazard), and asymmetric empty-leg encoding (a zero deposit root next to a `null` withdraw root). Tooling can read it, but it cannot satisfy this Part and must not be re-blessed byte for byte.
-
 ### Roll lifecycle: commitment chronology
 
 Pre-state evidence and post-state evidence are separate because a record built before execution cannot know the transaction hash or resulting block.
@@ -434,7 +458,7 @@ Pre-state evidence and post-state evidence are separate because a record built b
 10. Publish   publish and anchor R_E within the receipt grace
 ```
 
-Inside `rollEpoch`, the Zeit profile orders effects as follows: mark selections, emit selection hashes, check leg shapes, read the gross price, determine a final roll, process fees, mint or burn the aggregate legs, store roots and totals, emit commitments, seed the next start price, mark the epoch processed, and evaluate retirement.
+Inside `rollEpoch`, this profile orders effects as follows: mark selections, emit selection hashes, check leg shapes, read the gross price, determine a final roll, process fees, mint or burn the aggregate legs, store roots and totals, emit commitments, seed the next start price, mark the epoch processed, and evaluate retirement.
 
 Selection events do not prove pre-disclosure because they occur inside the roll. The pre-roll archive lists the same ids, and the verifier compares the emitted hashes afterward. A `dataURI` event field is only a location hint.
 
@@ -452,7 +476,7 @@ Three records describe distinct steps:
 
 Late cash must not change the price only for later redeemers. The pin's residual policy states whether a supplemental pro-rata distribution, recovery contract, or another named rule handles later proceeds. It also states who bears later expenses.
 
-Zero NAV is a distressed state, not a shortcut to clean closure. Before `rollEpochZeroNav`, the operator publishes and anchors a post-redemption valuation under Part III and a wind-down decision record. The post-transaction receipt records the terminal event. If transferable shares remain without an enforceable redemption, migration, burn, or recovery right, the verifier reports `STRANDED_SHARE_SUPPLY`. The subject cannot claim final closure. The unchanged Zeit zero-NAV ABI cannot anchor atomically, so it supports registry mode only.
+Zero NAV is a distressed state, not a shortcut to clean closure. Before `rollEpochZeroNav`, the operator publishes and anchors a post-redemption valuation under Part III and a wind-down decision record. The post-transaction receipt records the terminal event. If transferable shares remain without an enforceable redemption, migration, burn, or recovery right, the verifier reports `STRANDED_SHARE_SUPPLY`. The subject cannot claim final closure. A zero-NAV entry point that cannot carry or verify an atomic anchor supports registry mode only.
 
 ## Verification procedure (settlement scope)
 
@@ -473,48 +497,22 @@ Result codes are defined in Part I. Roots, conservation, and pricing make an int
 ## Security considerations
 
 - **Commitment is not solvency.** A correct root can still be underfunded. Verification checks aggregate funding and claim balances separately.
-- **A bad selected leaf can trap an owner.** The deployed profile has no forced correction. New contracts should add the bounded remedy described above and audit it against double payment.
+- **A bad selected leaf can trap an owner.** A profile with no forced correction remains operator-dependent. New contracts should add the bounded remedy described above and review it against double payment.
 - **Empty legs are value-bearing inputs.** New contracts must reject nonzero totals beside an empty id list. Archive detection alone does not prevent the transaction loss.
 - **First-deposit and donation attacks need an allocation rule.** A subject with zero shares and nonzero NAV blocks with `UNALLOCATED_ASSETS`. New deployments also set a minimum initial share supply or another reviewed anti-inflation rule, plus minimum request sizes that bound rounding loss. A zero-output deposit remains pending; it never becomes a free transfer to existing holders.
-- **Version guessing changes payouts.** A failed RPC is not evidence of a legacy settlement version. Only fingerprinted bytecode and the exact missing-selector behavior permit the legacy fallback.
+- **Version guessing changes payouts.** A failed RPC is not evidence of an older settlement version. Only fingerprinted bytecode and the exact missing-selector behavior permit a compatibility fallback.
 - **One high-water mark shifts fees between cohorts.** The equations are reproducible but do not remove that subsidy. Fundraising disclosures must state it.
 - **Retirement is a solvency event.** A fixed pin is safe only with full reserve coverage and a rule for later proceeds, expenses, and stranded shares.
 
-## Precursor implementation and migration gaps
-
-The reference decomposition is informative:
-
-- `BoringVault`: share ERC-20 and custody buffer.
-- `Teller`: mint, burn, and asset legs. Its production aggregate legs perform no on-chain price check. The caller supplies the share amount.
-- `Accountant`: PPS storage, one-shot epoch writes, and a raise-only high-water mark.
-- `FeeManager`: the fee math above.
-- `EscrowAdapter`: the remaining behavior in this Part.
-
-The compiler is `solc 0.8.23+commit.f704f362`. ABI fingerprints come from the generated manifest. For example, `EscrowAdapter` has `abiHash sha256:e9faca1a…d28e5ed1` and `deployedBytecodeHash sha256:496466e2…d79d0982`. The hub chain is Polygon PoS (137).
-
-| # | Gap (verified in source) | Status | Blocks |
-|---|---|---|---|
-| G1 | `dataURI` is unhashed and no registry commits archive bytes | open | L1 |
-| G2 | Archives have no PMVS authority attestation | open | L1 |
-| G3 | `Zeit-Legacy-Archive/0` uses a database UUID, JSON numbers, asymmetric empty legs, and no settlement version or final price | open | L1 |
-| G4 | Retirement records are absent; zero-NAV publishes no evidence; the pin is a mutable database field | open | L1 |
-| G5 | No public verifier performs read-back, root rebuild, or transaction comparison | open | production review |
-| G6 | The roll ABI cannot carry an anchor, so the unchanged deployment can use registry mode only | open | atomic mode |
-| G7 | The archive builder routed request ids through `Number()` | guarded since 2026-08-18; decimal-string migration remains | L1 wire format |
-| G8 | Empty id arrays with non-zero totals pass contract shape checks | open; archives expose but do not prevent it | contract safety |
-| G9 | A selected bad request has no timeout or rescue | open | bounded liveness |
-| G10 | Zero-NAV retirement can strand nonzero transferable share supply | open | clean closure |
-
-The precursor's Arweave uploader also gained post-status assertion and network-acceptance confirmation on 2026-08-18 (it previously ignored the post response entirely); the storage profile's full upload lifecycle, including byte-level read-back, remains open.
-
 ## Rationale
 
-- **Why PMVS does not replace ERC-4626 or ERC-7540.** A vault can expose an on-chain asserted `totalAssets()` and still depends on off-chain inputs. It may claim ERC-4626 or ERC-7540 only if every required interface and semantic rule holds. The deployed Zeit ABI does not. Its Merkle design keeps one roll independent of request count and shifts proof cost to claimants, so it remains a named custom profile.
-- **Why the archive is mandatory and published first.** The Zeit contracts do not compare totals with leaves or recompute user amounts. The archive supplies the missing evidence. Registry mode commits it before execution. Atomic mode makes commitment part of execution.
+- **Why PMVS composes with ERC-4626 and ERC-7540.** ERC-4626 defines synchronous vault operations, and ERC-7540 defines asynchronous request states. Prediction-market NAV can still depend on external position and venue inputs. PMVS adds the portfolio, valuation, funding, and settlement rules without weakening either ERC's interface requirements.
+- **Why epoch settlement is a vault profile.** Prediction-market positions may need time to sell, merge, or redeem before a withdrawal can be funded. The epoch freezes one request set, applies one valuation context, and gives every accepted request a deterministic result.
+- **Why the archive is mandatory and published first.** Aggregate settlement keeps roll cost independent of request count, but the contract may not compare aggregate totals with every leaf or recompute every user amount. The archive supplies the request-to-claim mapping. Registry mode commits it before execution. Atomic mode makes commitment part of execution.
 - **Why pre-state and post-state records differ.** A pre-settlement archive cannot know the future transaction hash, block, logs, or post-state. A receipt cannot serve as pre-disclosure.
 - **Why a funded pin is required.** A fixed price treats equal shares equally across the covered wind-down settlements only when the reserve can pay them all. An insolvent fixed price rewards early claims. Later proceeds need a separate residual rule.
-- **Why the global high-water mark is disclosed.** It is simple and matches the profile's contracts, but it does not equalize fee treatment across entry cohorts.
-- **Why version introspection is bytecode-gated for legacy.** Interpreting any RPC failure as "version 1" would price withdrawal claims at gross while a v2 contract settles at net, a funds-extraction bug rather than a compatibility fallback.
+- **Why the global high-water mark is disclosed.** It is simple, but it does not equalize fee treatment across entry cohorts.
+- **Why version introspection is bytecode-gated.** Interpreting any RPC failure as an older settlement version could price withdrawal claims at gross while the contract settles at net. Compatibility depends on positively identified code and behavior.
 
 ## Copyright
 

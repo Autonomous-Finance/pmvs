@@ -37,8 +37,6 @@ An Arweave L1 transaction id is `SHA-256(signature)`. The (randomized RSA-PSS) s
 4. **Two read paths.** Retrievability (Part I) is demonstrated against at least two independent read paths: distinct gateways, or a gateway plus a direct node. A record retrievable from fewer is not yet "published" for grace purposes.
 5. **Repair.** If the bytes become unretrievable (a dropped transaction, gateway loss), re-upload the identical bytes and register the new locator via `ArtifactLocationAdded`. The anchor never changes.
 
-**Precursor status (2026-08-18).** The precursor uploader asserts the post status and confirms network acceptance through the transaction status endpoint (accepting 200 seeded or 202 pending, with a bounded retry window of roughly 30 seconds) before returning a URI; it previously ignored the post response entirely. Persist-first, byte-level read-back, the two-read-path demonstration, and locator repair remain open work.
-
 ## Bundling (periodic records)
 
 Intraday records MAY be ANS-104 DataItems in a bundle. Each item keeps its own PMVS record hash and stream position. The location metadata records parent transaction id, DataItem id, byte offset, and byte length. A reader fetches the parent bytes, parses the container, verifies the DataItem id and signature, extracts its data, and then checks the PMVS record hash. Gateway unbundling and GraphQL indexing are optional discovery aids.

@@ -18,6 +18,7 @@
   "supersedes": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "share": {
     "decimals": "18",
+    "economicUnit": "pro-rata-nav",
     "permit": false,
     "pausable": false,
     "allowList": false,
@@ -32,6 +33,15 @@
     "decimals": "6",
     "unit": "usdc.e-base-unit"
   },
+  "portfolio": {
+    "kind": "prediction-market",
+    "custodyModel": "external-strategy",
+    "positionFormats": [
+      "erc1155"
+    ],
+    "entryAssetMode": "accounting-asset",
+    "exitAssetMode": "accounting-asset"
+  },
   "interfaces": [
     {
       "id": "erc20",
@@ -40,7 +50,7 @@
     }
   ],
   "profiles": {
-    "settlement": "settlement/zeit-epoch-merkle/1",
+    "settlement": "settlement/epoch-merkle/1",
     "anchor": "anchor/evm/1",
     "requestLiveness": "operator-dependent",
     "valuation": "pmvs-m1",
@@ -50,10 +60,50 @@
   },
   "contracts": [
     {
-      "role": "share-token",
+      "role": "share-vault",
       "chainId": "137",
       "address": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
       "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "settlement",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000002",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "teller",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000003",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "accountant",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000004",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "strategy-custody",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000005",
+      "accountType": "eoa",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "strategy-manager",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000006",
+      "accountType": "eoa",
       "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
       "proxy": null
     },

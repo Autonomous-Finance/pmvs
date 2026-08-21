@@ -150,7 +150,7 @@
         { "$ref": "#/$defs/recordBase" },
         {
           "type": "object",
-          "required": ["subjectId", "generation", "supersedes", "share", "accountingAsset", "interfaces", "profiles", "contracts", "authorities", "publication", "profileParameters", "migration"],
+          "required": ["subjectId", "generation", "supersedes", "share", "accountingAsset", "portfolio", "interfaces", "profiles", "contracts", "authorities", "publication", "profileParameters", "migration"],
           "properties": {
             "schema": { "const": "pmvs/components" },
             "context": {
@@ -164,9 +164,10 @@
             "supersedes": { "$ref": "#/$defs/hash" },
             "share": {
               "type": "object",
-              "required": ["decimals", "permit", "pausable", "allowList", "transferFee", "rebase", "hooks", "adminMutable"],
+              "required": ["decimals", "economicUnit", "permit", "pausable", "allowList", "transferFee", "rebase", "hooks", "adminMutable"],
               "properties": {
                 "decimals": { "$ref": "#/$defs/uint" },
+                "economicUnit": { "const": "pro-rata-nav" },
                 "permit": { "type": "boolean" },
                 "pausable": { "type": "boolean" },
                 "allowList": { "type": "boolean" },
@@ -174,6 +175,23 @@
                 "rebase": { "type": "boolean" },
                 "hooks": { "type": "boolean" },
                 "adminMutable": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "portfolio": {
+              "type": "object",
+              "required": ["kind", "custodyModel", "positionFormats", "entryAssetMode", "exitAssetMode"],
+              "properties": {
+                "kind": { "const": "prediction-market" },
+                "custodyModel": { "enum": ["direct", "external-strategy", "hybrid"] },
+                "positionFormats": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "entryAssetMode": { "enum": ["accounting-asset", "profile-defined"] },
+                "exitAssetMode": { "enum": ["accounting-asset", "profile-defined"] }
               },
               "additionalProperties": false
             },
@@ -203,7 +221,20 @@
               },
               "additionalProperties": false
             },
-            "contracts": { "type": "array", "items": { "$ref": "#/$defs/contractComponent" }, "minItems": 1 },
+            "contracts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contractComponent" },
+              "minItems": 7,
+              "allOf": [
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "share-vault" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "settlement" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "teller" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "accountant" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "strategy-manager" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "strategy-custody" } } }, "minContains": 1 },
+                { "contains": { "type": "object", "required": ["role"], "properties": { "role": { "const": "anchor" } } }, "minContains": 1 }
+              ]
+            },
             "authorities": { "type": "array", "items": { "$ref": "#/$defs/authority" }, "minItems": 5 },
             "publication": {
               "type": "object",

@@ -1,4 +1,4 @@
-# PMVS Part I. Core record protocol
+# PMVS Part I. Vault model and common requirements
 
 ```
 pmvs-part:      core
@@ -13,25 +13,33 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Abstract
 
-PMVS is an audit and settlement standard for tokenized vaults whose portfolios depend on data from prediction-market venues. It defines canonical records, authority attestations, record streams, on-chain anchors, verification results, and conformance claims. A verifier can reproduce settlement-bearing calculations from published inputs and compare chain-derived inputs with Ethereum state at pinned blocks.
+PMVS defines tokenized vaults that hold prediction-market shares, called outcome positions in this proposal. Investors hold one ERC-20 share of the whole vault. The share stays in circulation while the strategy trades, merges, and redeems its outcome positions.
+
+The standard defines the economic subject, custody perimeter, accounting asset, component roles, asynchronous lifecycle, and minimum holder protections. It also defines the records and on-chain commitments needed when price per share depends on venue data and positions held outside the share-token contract. A verifier can reproduce settlement-bearing calculations from published inputs and compare chain-derived inputs with Ethereum state at pinned blocks.
 
 PMVS does not prove that an unsigned venue response was true. It also has no challenge period, fraud proof, bond, or veto in version 1. Atomic anchoring can require a record commitment before a covered action executes. It cannot force the record's external inputs to be honest.
 
-This Part defines the machinery used by every other Part. Part II defines settlement evidence. Part III defines PMVS-M1 valuation. Profiles bind settlement interfaces, venues, storage systems, and watcher methods without placing their mutable facts in the core.
+This Part defines the vault model and common machinery used by every other Part. Part II defines asynchronous settlement. Part III defines PMVS-M1 valuation. Profiles bind settlement interfaces, venues, storage systems, and watcher methods without placing mutable deployment facts in the core.
 
 ## Motivation
 
-An ERC-20 vault share can remain in circulation while the vault trades many event-specific outcome positions. The share gives wallets and protocols a common token interface. ERC-20 does not explain how the vault valued external positions, which requests an operator selected, how fees changed the exchange rate, or whether claim amounts match an on-chain commitment.
+Prediction-market outcome positions are tied to specific questions and payout conditions. A managed strategy may hold many of them, then sell or redeem them and move to different markets. Making investors hold those positions directly would expose each investor to a changing set of ERC-1155 ids, settlement states, and venue operations.
 
-The operator often controls both the external data capture and the settlement transaction. A database row or an unhashed URI cannot support an independent audit. Later publication also cannot recover an order book, position set, or policy input that the operator failed to preserve at settlement time.
+One ERC-20 vault share gives the strategy a durable funding unit. The share represents a proportional unit of the declared vault NAV while the underlying outcome positions change. Wallets and protocols can integrate that stable token. Investors enter and exit in one accounting asset while the vault keeps the changing portfolio in custody.
 
-PMVS makes those assertions durable and comparable. The authority signs one canonical byte representation. An Ethereum transaction commits its hash. The record contains the inputs and outputs needed for a second implementation to repeat the calculation. The standard reports any remaining trust instead of renaming it verification.
+The modular [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small share vault from a Manager, Teller, and Accountant. PMVS applies that split to prediction markets and adds a declared strategy-custody perimeter, outcome-position inventory, venue-aware valuation, asynchronous settlement, and terminal-state rules.
+
+The operator often controls both the external data capture and the settlement transaction. ERC-20 does not explain how external positions were valued, which requests were accepted, how fees changed the exchange rate, or whether claims are funded. PMVS gives these facts common semantics and a canonical record that binds them to the vault.
 
 ## Scope
 
 Version 1 standardizes:
 
-- one stable subject identity for an ERC-20 vault share;
+- one stable subject identity for a prediction-market vault and its ERC-20 share;
+- the share's economic meaning and the vault's accounting asset;
+- the custody perimeter for cash, outcome positions, claims, and liabilities;
+- required component roles and minimum vault invariants;
+- asynchronous entry, exit, migration, and closure semantics;
 - versioned component generations beneath that identity;
 - canonical records and ordered record streams;
 - EIP-712 attestations by EOAs and ERC-1271 contract accounts;
@@ -39,24 +47,86 @@ Version 1 standardizes:
 - deterministic verifier results; and
 - conformance levels for settlement, valuation, and publication continuity.
 
-Version 1 does not standardize strategy selection, trading, custody governance, legal rights, token distribution, fundraising terms, secondary-market liquidity, venue truth, or loss remediation. A conformance claim does not approve an investment or prove that the share is fairly priced.
+Version 1 does not standardize market selection, trading strategy, legal ownership, token distribution, fundraising terms, secondary-market liquidity, venue truth, or loss remediation. A conformance claim does not approve an investment or prove that the share is fairly priced.
 
-Core v1 is EVM-specific. It uses Ethereum chain ids, 20-byte addresses, Keccak-256, ABI encoding, EIP-712, and EVM anchor events. A non-EVM port can preserve the record and evidence model only by assigning a new core version with explicit identity, signature, and anchor rules.
+Core v1 is EVM-specific. It uses Ethereum chain ids, 20-byte addresses, Keccak-256, ABI encoding, EIP-712, and EVM anchor events. A non-EVM port can preserve the vault semantics, but it needs a new core version with explicit identity, signature, and anchor rules.
 
 ## Design rules
 
-1. The core contains only facts shared across implementations. A venue endpoint, chain deployment, storage network, or legacy ABI belongs in a versioned profile.
-2. A verifier never guesses behavior from a filename, URI, failed RPC call, or unrecognized field.
-3. Every settlement-bearing quantity uses integer arithmetic with declared units and rounding.
-4. A record preserves the assertion that existed at the time. Corrections add history and never replace bytes.
-5. Interface support, record integrity, reproducible arithmetic, and truth of external data are separate claims.
+1. The investor share and the outcome positions are different economic objects. A vault MUST NOT describe one outcome token as a share of the whole portfolio.
+2. The vault includes every account that controls portfolio cash, positions, claim funding, or liabilities. Moving an asset between declared custody components MUST NOT change NAV.
+3. The core contains only facts shared across implementations. A venue endpoint, chain deployment, storage network, or custom ABI belongs in a versioned profile.
+4. A verifier never guesses behavior from a filename, URI, failed RPC call, or unrecognized field.
+5. Every settlement-bearing quantity uses integer arithmetic with declared units and rounding.
+6. A record preserves the assertion that existed at the time. Corrections add history and never replace bytes.
+7. Interface support, vault solvency, record integrity, reproducible arithmetic, and truth of external data are separate claims.
+
+## Vault architecture
+
+PMVS treats the vault as a group of components around one durable share token. A single contract may implement several roles. The component record MUST identify every role, the address for each on-chain component or authority, and the engine identity for each off-chain method.
+
+| Component role | Required responsibility |
+|---|---|
+| Share vault | Implements the ERC-20 share, controls supply, and may buffer the accounting asset during settlement |
+| Settlement component | Accepts deposits and redemption requests, escrows inputs, and moves requests through their declared states |
+| Teller | Mints or burns shares and transfers the accounting asset only under settlement rules |
+| Accountant | Stores or exposes the price per share and the fee state used by settlement |
+| Strategy manager | Moves capital into strategy custody and directs trades within declared permissions |
+| Strategy custody | Holds trading collateral, outcome positions, resolved claims, and venue receivables within the vault perimeter |
+| Valuation method | Converts every declared asset and liability into the accounting asset and computes NAV and price per share |
+| Governance and operating authorities | Control upgrades, settlement, valuation, fees, and custody under separate declared permissions |
+
+The common modular flow is:
+
+```text
+investor
+   |  deposit asset or redemption shares
+   v
+settlement component
+   |
+   v
+teller  <------  accountant  <------  valuation method
+   |
+   v
+share vault and settlement buffer
+   |
+   v
+strategy custody  ------>  prediction-market outcome positions
+   ^
+   |
+strategy manager
+```
+
+The share-vault contract does not need to hold the outcome positions directly. An external strategy wallet can hold them. The component record brings that wallet into the vault's custody perimeter, and the valuation record includes its balances. This separation follows the Boring Vault pattern while adding the inventory and settlement rules needed for prediction markets.
+
+## Minimum vault invariants
+
+Every conforming subject satisfies these rules:
+
+1. The share token implements ERC-20 and represents fungible, proportional units of one declared vault NAV. It does not encode one market, condition, or outcome.
+2. The active component generation declares one accounting asset and its decimals. Deposits, redemptions, NAV, price per share, and fees use that unit unless a named profile defines an exact conversion.
+3. Every outcome position, cash balance, receivable, claim reserve, and liability in the vault perimeter appears in valuation or in a declared exclusion with a reason.
+4. A supply increase corresponds to an accepted deposit, a declared fee mint, migration, or another profile-defined event. A supply decrease corresponds to an accepted redemption, migration, or declared burn.
+5. A deposit cannot receive shares from a valuation that omits existing holder assets. A redemption cannot receive assets from a valuation that omits liabilities or unfunded claims.
+6. A request has explicit pending, claimable or selected, claimed, cancelled, and failed behavior. The active settlement profile states every transition and who can trigger it.
+7. Migration preserves every outstanding share, pending request, funded claim, and recovery right. Terminal closure leaves no unexplained share supply or residual asset.
+8. ERC-4626, ERC-7540, and ERC-7575 support are separate interface claims. PMVS conformance does not excuse an incomplete implementation of another standard.
 
 ## Definitions
 
 - **Outcome position**: a claim tied to one market outcome. It may be an ERC-1155 token, another token type, or an entry in venue custody. It is an asset of the vault, not the PMVS share.
-- **Subject**: the economic vault under audit, identified by `(chainId, shareToken)`. An adapter or entry contract is not the subject because it may change while the share remains in circulation.
-- **Share token**: the ERC-20 that denotes proportional units of the subject. Its decimals and transfer restrictions are declared. EIP-2612 support is optional.
+- **Prediction-market vault**: the share token, components, custody accounts, assets, liabilities, authorities, and lifecycle rules that form one PMVS subject.
+- **Subject**: the economic vault identified by `(chainId, shareToken)`. An adapter or entry contract is not the subject because it may change while the share remains in circulation.
+- **Custody perimeter**: every address and venue account whose balances, positions, receivables, reserves, or liabilities belong to the subject.
+- **Share token**: the ERC-20 that denotes proportional NAV units of the subject. Its decimals and transfer restrictions are declared. EIP-2612 support is optional.
+- **Share vault**: the contract that implements the share token and controls its supply. It may also hold a temporary accounting-asset buffer.
 - **Accounting asset**: the asset in which NAV, price per share, deposits, withdrawals, and fees are stated. A profile declares its address, decimals, and unit. A subject may hold other cash assets, but the valuation method converts them into this unit.
+- **Price per share (PPS)**: the accounting-asset value assigned to one scaled unit of the ERC-20 share under the active valuation and fee rules.
+- **Settlement component**: the contract or group of contracts that accepts and settles deposit and redemption requests.
+- **Teller**: the component authorized to mint and burn share supply and to move the accounting asset during settlement.
+- **Accountant**: the component that stores or exposes the settlement price per share and related fee state.
+- **Strategy manager**: the component or authority that moves capital into strategy custody and directs permitted position operations.
+- **Strategy custody**: the component or declared account that holds trading collateral and outcome positions for the subject.
 - **Operator**: the off-chain actor that captures data, computes records, or submits settlement. The operator is not automatically an authority.
 - **Authority**: an on-chain role empowered to perform a class of privileged action. PMVS distinguishes five authorities. The **settlement authority** executes epoch rolls. The **valuation authority** publishes gross PPS. The **fee authority** sets the performance-fee rate. The **custody authority** moves collateral between system components and external custody. **Governance** rotates the other four. Their addresses MAY differ and MAY rotate independently.
 - **Component generation**: one declared configuration of contracts, authorities, profiles, and policy parameters beneath a subject.
@@ -85,14 +155,33 @@ A verifier MUST NOT infer one axis from another. Feature presence, such as cance
 
 1. Every record MUST identify its subject as `(chainId, shareToken)`, both fields canonical: a decimal-string chain id and a lowercase `0x` address.
 2. `subjectId` is defined as `keccak256(abi.encodePacked(uint256 chainId, address shareToken))`. Test vector: `chainId = 137`, `shareToken = 0x4aff8269a587643f68aa8e58c5ad93d9423e8624` gives `subjectId = 0x119eba4ba90359458811e719965925e255c3537b907914b6428f775c8d297892`.
-3. The share token MUST implement ERC-20. The first component record MUST state `shareDecimals`. It MUST also state whether transfers can be paused, blocked, taxed, rebased, allow-listed, or changed by an administrator. A false capability statement is a component mismatch. EIP-2612, ERC-4626, ERC-7540, and ERC-7575 support are separate, testable claims. PMVS conformance alone implies none of them.
-4. Each subject MUST directly anchor a `components` record as its subject-stream genesis before claiming conformance. Every later component generation MUST also be directly anchored before a changed component or policy governs a covered action.
-5. A component record MUST contain the subject, `subjectId`, generation number, previous component-record hash, accounting asset and decimals, share decimals, declared interface support, settlement profile, valuation method, venue profile, storage profile, chain confirmation depth, publication windows, and every behavior-selecting parameter used by those profiles.
-6. It MUST list each contract that can hold assets, mint or burn shares, accept requests, settle requests, set valuation, charge fees, anchor records, or move custody. Each entry contains its role, chain id, address, runtime-code hash, and proxy implementation data when applicable. An EOA component uses the zero code hash and is labeled `eoa`.
-7. It MUST list the current holder of each PMVS authority and the on-chain source used to resolve that holder. If no getter or event history makes a role independently recoverable, the component record MUST say `source: "attested"`; records governed by that role cannot pass historical authority verification and receive `UNVERIFIABLE_AUTHORITY`.
-8. Component migration over the same share token creates a new component record with `supersedes` set to the old record hash. The old history remains valid. The new record MUST state how every pending request, unclaimed settlement, escrowed balance, and authority obligation remains reachable. A migration with no complete path is not conforming.
-9. If the anchor contract changes, governance first signs and anchors the new component record through the old contract. That record declares the old and new anchors and every stream head to import. The subject-stream head is mandatory. A watcher head is also mandatory if that watcher will continue its existing stream. The new anchor imports each declared `(subjectId, streamId, sequence, recordHash)` and emits the migration event required by its profile. Later attestations use the new contract in their EIP-712 domain. Reusing an existing stream from an empty head would break its history and is not conforming.
-10. Records never span subjects. Internal database identifiers MAY appear under `meta`, but MUST NOT replace subject identity or any on-chain key.
+3. The share token MUST implement ERC-20. Each unit denotes the same proportional NAV interest as every other unit of that token, subject only to declared fees and transfer restrictions. It MUST NOT represent a specific outcome position.
+4. The first component record MUST state `shareDecimals` and `economicUnit: "pro-rata-nav"`. It MUST also state whether transfers can be paused, blocked, taxed, rebased, allow-listed, or changed by an administrator. A false capability statement is a component mismatch. EIP-2612, ERC-4626, ERC-7540, and ERC-7575 support are separate, testable claims. PMVS conformance alone implies none of them.
+5. The component record MUST contain a `portfolio` object. It declares `kind: "prediction-market"`, the custody model, the supported position formats, and whether entry and exit use the accounting asset or a named profile conversion.
+6. Each subject MUST directly anchor a `components` record as its subject-stream genesis before claiming conformance. Every later component generation MUST also be directly anchored before a changed component or policy governs a covered action.
+7. A component record MUST contain the subject, `subjectId`, generation number, previous component-record hash, accounting asset and decimals, share terms, portfolio declaration, interface support, settlement profile, valuation method, venue profile, storage profile, chain confirmation depth, publication windows, and every behavior-selecting parameter used by those profiles.
+8. It MUST list each contract or account that can hold subject assets, mint or burn shares, accept requests, settle requests, set valuation, charge fees, anchor records, or move custody. Each entry contains its role, chain id, address, runtime-code hash, and proxy implementation data when applicable. An EOA component uses the zero code hash and is labeled `eoa`. Venue accounts that have no EVM address use the account form defined by the venue profile.
+9. It MUST identify at least the share-vault, settlement, Teller, Accountant, strategy-manager, strategy-custody, and anchor roles. One address MAY hold more than one role. A subject with no separate Teller, Accountant, or Manager labels the contract or authority that performs the equivalent action.
+10. It MUST list the current holder of each PMVS authority and the on-chain source used to resolve that holder. If no getter or event history makes a role independently recoverable, the component record MUST say `source: "attested"`; records governed by that role cannot pass historical authority verification and receive `UNVERIFIABLE_AUTHORITY`.
+11. Component migration over the same share token creates a new component record with `supersedes` set to the old record hash. The old history remains valid. The new record MUST state how every pending request, unclaimed settlement, escrowed balance, custody position, and authority obligation remains reachable. A migration with no complete path is not conforming.
+12. If the anchor contract changes, governance first signs and anchors the new component record through the old contract. That record declares the old and new anchors and every stream head to import. The subject-stream head is mandatory. A watcher head is also mandatory if that watcher will continue its existing stream. The new anchor imports each declared `(subjectId, streamId, sequence, recordHash)` and emits the migration event required by its profile. Later attestations use the new contract in their EIP-712 domain. Reusing an existing stream from an empty head would break its history and is not conforming.
+13. Records never span subjects. Internal database identifiers MAY appear under `meta`, but MUST NOT replace subject identity or any on-chain key.
+
+### Portfolio declaration
+
+The component record's `portfolio` object has these fields:
+
+| Field | Meaning |
+|---|---|
+| `kind` | MUST be `prediction-market` in Core v1 |
+| `custodyModel` | `direct` when the share vault holds all positions, `external-strategy` when declared strategy accounts hold them, or `hybrid` when both do |
+| `positionFormats` | Nonempty list of token standards or versioned venue-ledger profiles used by the portfolio, such as `erc1155` |
+| `entryAssetMode` | `accounting-asset` or `profile-defined` |
+| `exitAssetMode` | `accounting-asset` or `profile-defined` |
+
+`economicUnit: "pro-rata-nav"` is an accounting definition. It means that each fungible share uses the same NAV and price-per-share basis within its component generation. It does not create a legal ownership claim beyond the rights supplied by the deployment.
+
+An `external-strategy` or `hybrid` subject MUST list every strategy-custody account under its venue profile and in the component record or its closed profile parameters. Part III reconstructs inventory across all of them. A custody-model or position-format change creates a new component generation before the new configuration receives or moves subject assets.
 
 ## PMVS-JCS/1: canonical serialization
 
@@ -165,7 +254,7 @@ validate the complete chain from [3] back to anchor A.
 
 The hash chain is fork-detecting, not append-only. A signer can issue two different records with the same `(subjectId, streamId, sequence, prev)`. Therefore:
 
-- Two attested records in the same stream with equal `(sequence, prev)` and different hashes are equivocation. `EQUIVOCATION` remains part of that stream's audit history even if only one branch was anchored.
+- Two attested records in the same stream with equal `(sequence, prev)` and different hashes are equivocation. `EQUIVOCATION` remains part of that stream's record history even if only one branch was anchored.
 - An anchor commits one selected ancestry, and only if every intermediate record is retrievable. It does not prove that omitted records never existed, and it does not prove cadence.
 - A component record that claims L3 declares `cadenceOrigin`, `cadenceSeconds`, and `publicationGraceSeconds`. Slot `n` is `[origin + n * cadence, origin + (n + 1) * cadence)`. Exactly one periodic valuation or gap record names each elapsed slot. A gap record gives a plain explanation and one reason: `venue_unavailable`, `chain_unavailable`, `operator_unavailable`, `unsafe_capture`, `storage_unavailable`, or `other`. A gap is evidence of missing data, not a substitute valuation.
 - A record published after its slot's grace carries `late: true` and receives `STALE`. A later correction cannot make the original publication timely.
@@ -242,7 +331,7 @@ event PMVSRecordAnchored(
 
 1. Records MUST be retrievable from content-addressed or content-verified public storage: given `recordHash`, any honest holder of the bytes can serve them and any verifier can check them. The storage layer is untrusted transport. No storage property participates in the trust argument.
 2. A storage profile (for example `storage/arweave/1`) defines the upload lifecycle, inclusion confirmation, read-back verification, discovery tagging, and bundling. Conformance claims name the profile.
-3. The standard does not use the word *permanence*. Storage claims are stated as testable properties: inclusion (the bytes were accepted at height H), retrievability (the bytes are servable from at least two independent read paths at audit time), mirroring (the operator retains and can re-serve the bytes), and retention assumptions (documented, economic or contractual, of the chosen network).
+3. The standard does not use the word *permanence*. Storage claims are stated as testable properties: inclusion (the bytes were accepted at height H), retrievability (the bytes are servable from at least two independent read paths at verification time), mirroring (the operator retains and can re-serve the bytes), and retention assumptions (documented, economic or contractual, of the chosen network).
 4. Operators MUST retain the canonical bytes of every record they have anchored and MUST be able to re-serve them. Loss of the only copy of an anchored record is `MISSING_RECORD` against the operator regardless of storage-network behavior.
 
 ## Verifier result codes
@@ -273,7 +362,7 @@ A verifier returns every applicable code. `VALID` is returned only when no other
 | `INCOMPLETE_CAPTURE` | A required response side, ladder depth, page, or raw input is missing or unlawfully truncated. |
 | `INCOMPLETE_INVENTORY` | The position-inventory rules of Part III are not satisfied; the record cannot support L2 claims. |
 | `UNVERIFIABLE_INVENTORY` | Inventory completeness cannot be established from public data for this record. |
-| `UNVERIFIABLE_INPUTS` | The record predates the standard or lacks pinned inputs. This is the permanent classification of all pre-standard history, including the precursor deployment's past valuations. |
+| `UNVERIFIABLE_INPUTS` | The record predates the standard or lacks pinned inputs. This is the permanent classification of history whose settlement-bearing inputs were not preserved. |
 | `INCONCLUSIVE` | A corroboration check (watcher bracketing) had no eligible evidence. |
 | `FIDELITY_SUSPECT` | Statistical corroboration flagged operator-published venue inputs (watcher profile). Evidence, not proof. |
 
@@ -291,9 +380,9 @@ Every deployment declares its settlement, anchor, request-liveness, valuation, v
 
 | Level | Requirements |
 |---|---|
-| **L1, settlement-auditable** | Every executed settlement has a complete Part II archive. The authority signed it, a conforming anchor committed it, and settlement verification passes. The archive was available no later than the profile's publication deadline. Retirement records cover every retirement transition. |
+| **L1, settlement-complete** | Every executed settlement has a complete Part II archive and funded claim path. The authority signed the archive, a conforming anchor committed it, and settlement verification passes. The archive was available no later than the profile's publication deadline. Retirement records cover every retirement transition. |
 | **L2, valuation-reproducible** | L1 plus a pre-settlement valuation and post-settlement receipt for every settlement. The inventory is complete under Part III. Pure re-execution reproduces each settlement-bearing output. |
-| **L3, continuity-auditable** | L2 plus one timely valuation or explicit gap for every cadence slot, no run of gaps beyond the declared maximum, timely anchors, and the correction rules in this Part. |
+| **L3, continuous-record** | L2 plus one timely valuation or explicit gap for every cadence slot, no run of gaps beyond the declared maximum, timely anchors, and the correction rules in this Part. |
 
 Anchor mode is an independent claim:
 
@@ -308,9 +397,7 @@ A complete claim uses this form:
 
 An L3 claim adds its cadence parameters. A watcher claim adds `W(...)`. The phrase "PMVS compliant" on its own has no defined meaning.
 
-**Precursor status.** The Zeit deployment that motivated this standard currently conforms to no level. Its per-roll archives use a pre-standard shape. They have no PMVS hash anchor, attestation, retirement record, or verifier. Parts II and III list the remaining migration gaps. Four valuation safety defects were closed in the precursor on 2026-08-18, but the record-format and conformance work remains open. Pre-standard history is always `UNVERIFIABLE_INPUTS`. Conformance can begin only at the first conforming record.
-
-## Trust framing
+## Verification boundaries
 
 Verification separates three results:
 
@@ -326,7 +413,7 @@ Atomic anchoring can prevent settlement without a commitment. It cannot prevent 
 - **Rotation races.** Anchor-time authority validation prevents a revoked key from anchoring a backdated record. Implementations MUST NOT select authority from the valuation block.
 - **Equivocation.** Fork detection depends on verifiers comparing records across sources. The registry's compare-and-set head prevents two commits at the same `(subjectId, streamId, sequence)`.
 - **ERC-1271 policy changes.** A contract account may accept a signature at one block and reject it later. The anchor-time contract call and event preserve the accepted result. Transitive anchoring without that call does not.
-- **Anchor defects.** A faulty authority resolver or anchor contract can accept an unauthorized record or corrupt its head. Its address, runtime-code hash, proxy state, and audit status MUST be disclosed. Verifiers MUST compare them with the active component record.
+- **Anchor defects.** A faulty authority resolver or anchor contract can accept an unauthorized record or corrupt its head. Its address, runtime-code hash, proxy state, and security-review status MUST be disclosed. Verifiers MUST compare them with the active component record.
 - **External data.** A venue may omit positions, return stale data, change an endpoint, or show cancellable liquidity. T1 and T2 do not prove such data true. Profiles define failure handling. Watchers may add limited evidence.
 - **Profile confusion.** A verifier MUST stop before behavior selection if it does not implement the named profile or version. Falling back after a failed RPC or parse is unsafe.
 - **Storage retention.** Content-addressed storage networks have economic, not absolute, retention. The mirroring and re-serve obligations above keep the trust argument independent of any single network's behavior.

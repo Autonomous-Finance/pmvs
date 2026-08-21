@@ -1,12 +1,12 @@
 # Contributing to PMVS
 
-PMVS describes evidence used to price and settle investor claims. A vague sentence, stale address, or changed rounding rule can alter who receives value. Treat normative edits as protocol changes, not copy edits.
+PMVS defines a prediction-market vault whose ERC-20 share depends on position inventory, NAV, and asynchronous settlement. A vague sentence, stale address, or changed rounding rule can alter what a share represents or who receives value. Treat normative edits as protocol changes, not copy edits.
 
 ## Change classes
 
 Every pull request identifies one primary class:
 
-- **Core:** identity, encoding, signatures, streams, anchors, verdicts, or conformance.
+- **Core:** vault semantics, custody perimeter, components, identity, encoding, signatures, anchors, verdicts, or conformance.
 - **Settlement:** request states, commitments, arithmetic, claims, receipts, or retirement.
 - **Valuation:** inventory, capture, marking, NAV, policy gates, or replay.
 - **Profile:** a chain, contract interface, venue, storage system, or watcher binding.
@@ -58,8 +58,8 @@ bun test
 git diff --check
 ```
 
-The suite validates the JSON Schema, canonicalization, EIP-712 signatures, subject identity, Merkle vectors, fee arithmetic, relative links, and the repository prose gate. Passing tests do not replace contract audits, independent implementations, or economic review.
+The suite validates the JSON Schema, canonicalization, EIP-712 signatures, subject identity, Merkle vectors, fee arithmetic, relative links, and the repository prose gate. Passing tests do not replace contract security review, independent implementations, or economic review.
 
 ## Review boundary
 
-Do not claim EIP status, adoption, audit coverage, or production conformance without direct evidence. A production conformance claim still needs the gates in [`README.md`](./README.md), including two independent verifiers and audited anchor and settlement contracts.
+Do not claim EIP status, adoption, security-review coverage, or production conformance without direct evidence. A production conformance claim still needs the gates in [`README.md`](./README.md), including two independent verifiers and independently reviewed anchor and settlement contracts.

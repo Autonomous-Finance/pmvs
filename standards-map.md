@@ -1,6 +1,6 @@
 # Standards map
 
-PMVS has one narrow purpose: make externally valued prediction-market vault settlements reproducible and attributable. Existing ERCs already define the tokens and common vault interfaces around that purpose.
+PMVS has one purpose: define a fungible vault share over a rotating portfolio of prediction-market outcome positions. The standard adds the custody, valuation, asynchronous settlement, and lifecycle rules that give that share a consistent meaning. Existing ERCs still define the token and common vault interfaces.
 
 This map favors Final standards with deployed, composable interfaces. Draft and Review proposals appear only as related work. Statuses were checked on 2026-08-21 and must be checked again before publication. An idea does not become a PMVS dependency until its interface and status are stable enough for that role.
 
@@ -13,7 +13,7 @@ This map favors Final standards with deployed, composable interfaces. Draft and 
 | [ERC-1155](https://eips.ethereum.org/EIPS/eip-1155) | Many token types in one contract | Event-specific outcome positions held by custody | An outcome token is not the same economic object as a vault share. |
 | [ERC-2612](https://eips.ethereum.org/EIPS/eip-2612) | Signed ERC-20 approvals | Optional share-token convenience | PMVS does not require permit, and permit does not authorize settlement records. |
 | [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) | A tokenized-vault interface for one accounting asset | Optional interface for a fully conforming implementation | `totalAssets()` must not revert, and PMVS records do not excuse any method, preview, limit, or rounding rule. |
-| [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540) | Pending, claimable, and claimed states for asynchronous vault requests | Preferred request model for new settlement profiles | The standard builds on ERC-7575. The Zeit ABI is not ERC-7540 merely because both systems use requests. |
+| [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540) | Pending, claimable, and claimed states for asynchronous vault requests | Preferred request model for new settlement profiles | The standard builds on ERC-7575. A custom epoch ABI is not ERC-7540 merely because both systems use requests. |
 | [ERC-7575](https://eips.ethereum.org/EIPS/eip-7575) | External ERC-20 shares and multiple asset entry points | Keeps one share identity across component or entry-point changes | A shared token does not prove that every linked vault uses the same accounting correctly. |
 | [EIP-712](https://eips.ethereum.org/EIPS/eip-712) | Typed structured-data signing | Binds a record hash, subject, stream, kind, sequence, record predecessor, prior anchor, chain, and anchor contract | EIP-712 does not add replay protection on its own. |
 | [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) | Signature validation for contract accounts | Lets a Safe or another contract authority attest records | A current `isValidSignature` result may differ from the result at anchor time. The anchor contract must validate it on-chain. |
@@ -24,7 +24,7 @@ This map favors Final standards with deployed, composable interfaces. Draft and 
 
 ### Keep the base small
 
-ERC-20 succeeded by standardizing a small interface that many applications could reuse. PMVS follows that pattern by keeping venue endpoints, storage networks, and settlement ABIs out of the core record rules.
+ERC-20 succeeded by standardizing a small interface that many applications could reuse. PMVS keeps the core vault model small: one durable share, one accounting unit, a declared custody perimeter, explicit component roles, and versioned settlement and valuation profiles.
 
 ### Extend instead of renaming
 
@@ -52,16 +52,22 @@ EIP-712 makes the signed message unambiguous. ERC-1271 supports contract authori
 
 ## Related drafts
 
-[ERC-8113](https://eips.ethereum.org/EIPS/eip-8113) proposes series accounting for performance fees in ERC-4626 and ERC-7540 vaults. Its free-rider analysis is relevant to PMVS deployments that use one vault-wide high-water mark. Because ERC-8113 is a Draft and changes the share-accounting model, PMVS v1 records the deployed fee method exactly and requires the deployment to disclose cohort effects. A later fee profile can adopt series accounting without changing the core record protocol.
+[ERC-8113](https://eips.ethereum.org/EIPS/eip-8113) proposes series accounting for performance fees in ERC-4626 and ERC-7540 vaults. Its free-rider analysis is relevant to PMVS deployments that use one vault-wide high-water mark. Because ERC-8113 is a Draft and changes the share-accounting model, PMVS v1 records the deployed fee method exactly and requires the deployment to disclose cohort effects. A later fee profile can adopt series accounting without changing the core vault model.
 
-ERC-8330 is closer to PMVS valuation records, but the scopes differ. ERC-8330 standardizes an on-chain NAV publication and query lifecycle. PMVS-M1 defines a reproducible method for a particular class of prediction-market portfolios and binds the detailed evidence needed to audit settlement. An adapter may publish a PMVS output to an ERC-8330 stream after the adapter fixes the NAV basis, decimals, methodology-hash derivation, and staleness policy.
+ERC-8330 is close to the PMVS valuation layer, but the scopes differ. ERC-8330 standardizes an on-chain NAV publication and query lifecycle. PMVS defines the vault and gives PMVS-M1 a position-inventory and valuation method for prediction-market portfolios. An adapter may publish a PMVS output to an ERC-8330 stream after it fixes the NAV basis, decimals, methodology-hash derivation, and staleness policy.
+
+## Reference architecture
+
+The [Boring Vault architecture](https://docs.veda.tech/architecture-and-flow-of-funds) separates a small vault from its Manager, Teller, and Accountant. PMVS follows that modular pattern but narrows it to prediction-market portfolios. It adds a declared outcome-position custody perimeter, a venue-aware NAV method, asynchronous request settlement, claim funding, and retirement rules.
+
+The term describes the architecture and makes no claim about source-code inheritance. An implementation can use another contract suite if it satisfies the same PMVS behavior and declares every component.
 
 ## EIP process status
 
-Under [EIP-1](https://eips.ethereum.org/EIPS/eip-1), a Standards Track proposal needs one focused idea, a complete interoperable specification, rationale, backwards compatibility, security considerations, and a public discussion venue. PMVS is still a pre-EIP suite. The portable record protocol may become one ERC proposal. Venue, storage, valuation, and legacy settlement profiles should remain auxiliary specifications so mutable operational facts do not enter a Final ERC.
+Under [EIP-1](https://eips.ethereum.org/EIPS/eip-1), a Standards Track proposal needs one focused idea, a complete interoperable specification, rationale, backwards compatibility, security considerations, and a public discussion venue. PMVS is still a pre-EIP suite. The portable vault model and discovery surface may become one ERC proposal. Venue, storage, valuation, and compatibility settlement profiles should remain auxiliary specifications so mutable operational facts do not enter a Final ERC.
 
 ## Backwards compatibility
 
-PMVS does not reinterpret old archives as conforming records. A deployment begins conformance with a new component genesis, schema, authority attestation, and anchor. Earlier bytes retain their old meaning and receive `UNVERIFIABLE_INPUTS` where evidence is missing.
+PMVS does not reinterpret old records as conforming records. A deployment begins conformance with a new component genesis, schema, authority attestation, and anchor. Earlier bytes retain their old meaning and receive `UNVERIFIABLE_INPUTS` where inputs are missing.
 
-The custom Zeit ABI remains readable through `settlement/zeit-epoch-merkle/1`. New ERC-7540 or ERC-7575 entry points use different settlement profiles. A component migration can keep the same ERC-20 subject only when it preserves every pending request, funded claim, and holder right.
+The custom epoch interface remains readable through its compatibility leaf profile. New ERC-7540 or ERC-7575 entry points use their own settlement profiles. A component migration can keep the same ERC-20 subject only when it preserves every pending request, funded claim, custody position, and holder right.

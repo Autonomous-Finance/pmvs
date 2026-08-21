@@ -63,14 +63,14 @@ export function subjectId(chainId: bigint, shareToken: Address): Hex {
   return keccak256(encodePacked(["uint256", "address"], [chainId, shareToken]));
 }
 
-export type LegacyLeafInput = {
+export type CompatibilityLeafInput = {
   requestId: bigint;
   owner: Address;
   amount: bigint;
   epoch: bigint;
 };
 
-export function legacyLeaf(input: LegacyLeafInput): Hex {
+export function compatibilityLeaf(input: CompatibilityLeafInput): Hex {
   return keccak256(
     encodePacked(
       ["uint256", "address", "uint256", "uint64"],
@@ -83,17 +83,17 @@ function orderedPair(a: Hex, b: Hex): [Hex, Hex] {
   return a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a];
 }
 
-export function legacyNode(a: Hex, b: Hex): Hex {
+export function compatibilityNode(a: Hex, b: Hex): Hex {
   return keccak256(concat(orderedPair(a, b)));
 }
 
-export function legacyRoot(leaves: readonly Hex[]): Hex {
+export function compatibilityRoot(leaves: readonly Hex[]): Hex {
   if (leaves.length === 0) return ZERO_HASH;
   let level = [...leaves];
   while (level.length > 1) {
     const next: Hex[] = [];
     for (let i = 0; i < level.length; i += 2) {
-      next.push(legacyNode(level[i], level[i + 1] ?? level[i]));
+      next.push(compatibilityNode(level[i], level[i + 1] ?? level[i]));
     }
     level = next;
   }
@@ -102,7 +102,7 @@ export function legacyRoot(leaves: readonly Hex[]): Hex {
 
 export const PMVS_MERKLE_TAG = keccak256(stringToHex("PMVS:MERKLE:1"));
 
-export type PMVSMerkleLeafInput = LegacyLeafInput & {
+export type PMVSMerkleLeafInput = CompatibilityLeafInput & {
   chainId: bigint;
   settlementContract: Address;
   leg: 0 | 1;
