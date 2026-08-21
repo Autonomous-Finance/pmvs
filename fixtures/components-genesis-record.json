@@ -1,0 +1,136 @@
+{
+  "schema": "pmvs/components",
+  "schemaVersion": "1",
+  "subject": {
+    "chainId": "137",
+    "shareToken": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624"
+  },
+  "components": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "context": {
+    "stream": "subject",
+    "kind": "components",
+    "sequence": "0",
+    "prev": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "producedAt": "1787328000"
+  },
+  "subjectId": "0x119eba4ba90359458811e719965925e255c3537b907914b6428f775c8d297892",
+  "generation": "0",
+  "supersedes": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "share": {
+    "decimals": "18",
+    "permit": false,
+    "pausable": false,
+    "allowList": false,
+    "transferFee": false,
+    "rebase": false,
+    "hooks": false,
+    "adminMutable": false
+  },
+  "accountingAsset": {
+    "chainId": "137",
+    "address": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+    "decimals": "6",
+    "unit": "usdc.e-base-unit"
+  },
+  "interfaces": [
+    {
+      "id": "erc20",
+      "supported": true,
+      "contract": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624"
+    }
+  ],
+  "profiles": {
+    "settlement": "settlement/zeit-epoch-merkle/1",
+    "anchor": "anchor/evm/1",
+    "requestLiveness": "operator-dependent",
+    "valuation": "pmvs-m1",
+    "venue": "venue/polymarket/1",
+    "storage": "storage/arweave/1",
+    "watcher": null
+  },
+  "contracts": [
+    {
+      "role": "share-token",
+      "chainId": "137",
+      "address": "0x4aff8269a587643f68aa8e58c5ad93d9423e8624",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    },
+    {
+      "role": "anchor",
+      "chainId": "137",
+      "address": "0x0000000000000000000000000000000000000001",
+      "accountType": "contract",
+      "runtimeCodeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "proxy": null
+    }
+  ],
+  "authorities": [
+    {
+      "role": "settlement",
+      "holder": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+      "source": {
+        "type": "onchain",
+        "contract": "0x0000000000000000000000000000000000000002",
+        "getter": "settlementAuthority()",
+        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "role": "valuation",
+      "holder": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+      "source": {
+        "type": "onchain",
+        "contract": "0x0000000000000000000000000000000000000002",
+        "getter": "valuationAuthority()",
+        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "role": "fee",
+      "holder": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+      "source": {
+        "type": "onchain",
+        "contract": "0x0000000000000000000000000000000000000002",
+        "getter": "feeAuthority()",
+        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "role": "custody",
+      "holder": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+      "source": {
+        "type": "onchain",
+        "contract": "0x0000000000000000000000000000000000000002",
+        "getter": "custodyAuthority()",
+        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "role": "governance",
+      "holder": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+      "source": {
+        "type": "onchain",
+        "contract": "0x0000000000000000000000000000000000000002",
+        "getter": "governance()",
+        "eventTopic": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "publication": {
+    "confirmationDepth": "128",
+    "captureWindowSeconds": "300",
+    "graceSeconds": {
+      "settlement-archive": "0",
+      "receipt": "3600"
+    },
+    "cadence": null
+  },
+  "profileParameters": {},
+  "migration": null,
+  "extensions": [],
+  "meta": {
+    "fixture": "illustrative addresses and code hashes; not a deployment record"
+  }
+}

@@ -1,0 +1,760 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous.finance/pmvs/schemas/pmvs-envelope-v1.schema.json",
+  "title": "PMVS v1 record envelope",
+  "type": "object",
+  "required": ["record", "attestation", "locations"],
+  "properties": {
+    "record": { "$ref": "#/$defs/record" },
+    "attestation": { "$ref": "#/$defs/attestation" },
+    "locations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uint": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "sint": { "type": "string", "pattern": "^(0|-?[1-9][0-9]*)$" },
+    "address": { "type": "string", "pattern": "^0x[0-9a-f]{40}$" },
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "hexData": { "type": "string", "pattern": "^0x([0-9a-f]{2})*$" },
+    "subject": {
+      "type": "object",
+      "required": ["chainId", "shareToken"],
+      "properties": {
+        "chainId": { "$ref": "#/$defs/uint" },
+        "shareToken": { "$ref": "#/$defs/address" }
+      },
+      "additionalProperties": false
+    },
+    "extension": {
+      "type": "object",
+      "required": ["id", "critical", "value"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]*$" },
+        "critical": { "type": "boolean" },
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/extension" }
+    },
+    "subjectContext": {
+      "type": "object",
+      "required": ["stream", "kind", "sequence", "prev", "producedAt"],
+      "properties": {
+        "stream": { "const": "subject" },
+        "kind": { "type": "string" },
+        "sequence": { "$ref": "#/$defs/uint" },
+        "prev": { "$ref": "#/$defs/hash" },
+        "producedAt": { "$ref": "#/$defs/uint" },
+        "valuationTime": { "$ref": "#/$defs/uint" },
+        "epoch": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] },
+        "slot": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] },
+        "late": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "watcherContext": {
+      "type": "object",
+      "required": ["stream", "producer", "kind", "sequence", "prev", "producedAt", "observationTime"],
+      "properties": {
+        "stream": { "const": "watcher" },
+        "producer": { "$ref": "#/$defs/address" },
+        "kind": { "const": "watcher-observation" },
+        "sequence": { "$ref": "#/$defs/uint" },
+        "prev": { "$ref": "#/$defs/hash" },
+        "producedAt": { "$ref": "#/$defs/uint" },
+        "observationTime": { "$ref": "#/$defs/uint" },
+        "late": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "recordBase": {
+      "type": "object",
+      "required": ["schema", "schemaVersion", "subject", "components", "context", "extensions", "meta"],
+      "properties": {
+        "schema": { "type": "string" },
+        "schemaVersion": { "const": "1" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "components": { "$ref": "#/$defs/hash" },
+        "context": { "type": "object" },
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "meta": { "type": "object" }
+      }
+    },
+    "interfaceClaim": {
+      "type": "object",
+      "required": ["id", "supported", "contract"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "supported": { "type": "boolean" },
+        "contract": { "$ref": "#/$defs/address" }
+      },
+      "additionalProperties": false
+    },
+    "contractComponent": {
+      "type": "object",
+      "required": ["role", "chainId", "address", "accountType", "runtimeCodeHash", "proxy"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "chainId": { "$ref": "#/$defs/uint" },
+        "address": { "$ref": "#/$defs/address" },
+        "accountType": { "enum": ["contract", "eoa"] },
+        "runtimeCodeHash": { "$ref": "#/$defs/hash" },
+        "proxy": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["implementation", "implementationCodeHash", "admin"],
+              "properties": {
+                "implementation": { "$ref": "#/$defs/address" },
+                "implementationCodeHash": { "$ref": "#/$defs/hash" },
+                "admin": { "$ref": "#/$defs/address" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": ["role", "holder", "source"],
+      "properties": {
+        "role": { "enum": ["settlement", "valuation", "fee", "custody", "governance"] },
+        "holder": { "$ref": "#/$defs/address" },
+        "source": {
+          "type": "object",
+          "required": ["type", "contract", "getter", "eventTopic"],
+          "properties": {
+            "type": { "enum": ["onchain", "attested"] },
+            "contract": { "oneOf": [{ "$ref": "#/$defs/address" }, { "type": "null" }] },
+            "getter": { "oneOf": [{ "type": "string" }, { "type": "null" }] },
+            "eventTopic": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "componentsRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["subjectId", "generation", "supersedes", "share", "accountingAsset", "interfaces", "profiles", "contracts", "authorities", "publication", "profileParameters", "migration"],
+          "properties": {
+            "schema": { "const": "pmvs/components" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "components" } } }
+              ]
+            },
+            "subjectId": { "$ref": "#/$defs/hash" },
+            "generation": { "$ref": "#/$defs/uint" },
+            "supersedes": { "$ref": "#/$defs/hash" },
+            "share": {
+              "type": "object",
+              "required": ["decimals", "permit", "pausable", "allowList", "transferFee", "rebase", "hooks", "adminMutable"],
+              "properties": {
+                "decimals": { "$ref": "#/$defs/uint" },
+                "permit": { "type": "boolean" },
+                "pausable": { "type": "boolean" },
+                "allowList": { "type": "boolean" },
+                "transferFee": { "type": "boolean" },
+                "rebase": { "type": "boolean" },
+                "hooks": { "type": "boolean" },
+                "adminMutable": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "accountingAsset": {
+              "type": "object",
+              "required": ["chainId", "address", "decimals", "unit"],
+              "properties": {
+                "chainId": { "$ref": "#/$defs/uint" },
+                "address": { "$ref": "#/$defs/address" },
+                "decimals": { "$ref": "#/$defs/uint" },
+                "unit": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            },
+            "interfaces": { "type": "array", "items": { "$ref": "#/$defs/interfaceClaim" } },
+            "profiles": {
+              "type": "object",
+              "required": ["settlement", "anchor", "requestLiveness", "valuation", "venue", "storage", "watcher"],
+              "properties": {
+                "settlement": { "type": "string", "minLength": 1 },
+                "anchor": { "type": "string", "minLength": 1 },
+                "requestLiveness": { "enum": ["bounded", "operator-dependent"] },
+                "valuation": { "type": "string", "minLength": 1 },
+                "venue": { "type": "string", "minLength": 1 },
+                "storage": { "type": "string", "minLength": 1 },
+                "watcher": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+              },
+              "additionalProperties": false
+            },
+            "contracts": { "type": "array", "items": { "$ref": "#/$defs/contractComponent" }, "minItems": 1 },
+            "authorities": { "type": "array", "items": { "$ref": "#/$defs/authority" }, "minItems": 5 },
+            "publication": {
+              "type": "object",
+              "required": ["confirmationDepth", "captureWindowSeconds", "graceSeconds", "cadence"],
+              "properties": {
+                "confirmationDepth": { "$ref": "#/$defs/uint" },
+                "captureWindowSeconds": { "$ref": "#/$defs/uint" },
+                "graceSeconds": { "type": "object" },
+                "cadence": {
+                  "oneOf": [
+                    { "type": "null" },
+                    {
+                      "type": "object",
+                      "required": ["origin", "seconds", "evaluationWindowSeconds", "maxConsecutiveGaps"],
+                      "properties": {
+                        "origin": { "$ref": "#/$defs/uint" },
+                        "seconds": { "$ref": "#/$defs/uint" },
+                        "evaluationWindowSeconds": { "$ref": "#/$defs/uint" },
+                        "maxConsecutiveGaps": { "$ref": "#/$defs/uint" }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "profileParameters": { "type": "object" },
+            "migration": { "oneOf": [{ "type": "object" }, { "type": "null" }] }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "chainRead": {
+      "type": "object",
+      "required": ["role", "contract", "callData", "returnData", "decoded", "unit"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "contract": { "$ref": "#/$defs/address" },
+        "callData": { "$ref": "#/$defs/hexData" },
+        "returnData": { "$ref": "#/$defs/hexData" },
+        "decoded": {},
+        "unit": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "chainState": {
+      "type": "object",
+      "required": ["chainId", "blockNumber", "blockHash", "blockTimestamp", "reads"],
+      "properties": {
+        "chainId": { "$ref": "#/$defs/uint" },
+        "blockNumber": { "$ref": "#/$defs/uint" },
+        "blockHash": { "$ref": "#/$defs/hash" },
+        "blockTimestamp": { "$ref": "#/$defs/uint" },
+        "reads": { "type": "array", "items": { "$ref": "#/$defs/chainRead" } }
+      },
+      "additionalProperties": false
+    },
+    "rawResponse": {
+      "type": "object",
+      "required": ["source", "request", "startedAtMs", "endedAtMs", "bytesHash", "locations", "correlation"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "request": { "type": "string", "minLength": 1 },
+        "startedAtMs": { "$ref": "#/$defs/uint" },
+        "endedAtMs": { "$ref": "#/$defs/uint" },
+        "bytesHash": { "$ref": "#/$defs/hash" },
+        "locations": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "correlation": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "positionOutput": {
+      "type": "object",
+      "required": ["tokenId", "markMethod", "filled", "unfilled", "grossMark", "venueExitCost", "mark", "maximumPayout", "venueReferenceMark"],
+      "properties": {
+        "tokenId": { "$ref": "#/$defs/uint" },
+        "markMethod": { "enum": ["cross", "redemption", "writeoff_zero_bid", "excluded_negligible"] },
+        "filled": { "$ref": "#/$defs/uint" },
+        "unfilled": { "$ref": "#/$defs/uint" },
+        "grossMark": { "$ref": "#/$defs/uint" },
+        "venueExitCost": { "$ref": "#/$defs/uint" },
+        "mark": { "$ref": "#/$defs/uint" },
+        "maximumPayout": { "$ref": "#/$defs/uint" },
+        "venueReferenceMark": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    },
+    "valuationRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["method", "inputs", "outputs"],
+          "properties": {
+            "schema": { "const": "pmvs/valuation-record" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "const": "valuation" },
+                    "valuationTime": { "$ref": "#/$defs/uint" },
+                    "epoch": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] },
+                    "slot": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] }
+                  },
+                  "required": ["valuationTime", "epoch", "slot"],
+                  "anyOf": [
+                    { "type": "object", "properties": { "epoch": { "$ref": "#/$defs/uint" }, "slot": { "type": "null" } } },
+                    { "type": "object", "properties": { "epoch": { "type": "null" }, "slot": { "$ref": "#/$defs/uint" } } }
+                  ]
+                }
+              ]
+            },
+            "method": {
+              "type": "object",
+              "required": ["id", "engine", "engineVersion", "sourceCommit", "artifactHash", "parameters"],
+              "properties": {
+                "id": { "const": "pmvs-m1" },
+                "engine": { "type": "string", "minLength": 1 },
+                "engineVersion": { "type": "string", "minLength": 1 },
+                "sourceCommit": { "type": "string", "minLength": 1 },
+                "artifactHash": { "$ref": "#/$defs/hash" },
+                "parameters": { "type": "object" }
+              },
+              "additionalProperties": false
+            },
+            "inputs": {
+              "type": "object",
+              "required": ["chainState", "venueState", "capture"],
+              "properties": {
+                "chainState": { "type": "array", "items": { "$ref": "#/$defs/chainState" }, "minItems": 1 },
+                "venueState": {
+                  "type": "object",
+                  "required": ["profile", "positions", "books", "responses"],
+                  "properties": {
+                    "profile": { "type": "string", "minLength": 1 },
+                    "positions": { "type": "array", "items": { "type": "object" } },
+                    "books": { "type": "array", "items": { "type": "object" } },
+                    "responses": { "type": "array", "items": { "$ref": "#/$defs/rawResponse" } }
+                  },
+                  "additionalProperties": false
+                },
+                "capture": {
+                  "type": "object",
+                  "required": ["startedAtMs", "endedAtMs", "maxSkewMs"],
+                  "properties": {
+                    "startedAtMs": { "$ref": "#/$defs/uint" },
+                    "endedAtMs": { "$ref": "#/$defs/uint" },
+                    "maxSkewMs": { "$ref": "#/$defs/uint" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "outputs": {
+              "type": "object",
+              "required": ["perPosition", "cashValue", "overlayValue", "positionsValue", "grossAssets", "liabilities", "navSigned", "nav", "navDeficit", "totalSupply", "pps", "referencePps"],
+              "properties": {
+                "perPosition": { "type": "array", "items": { "$ref": "#/$defs/positionOutput" } },
+                "cashValue": { "$ref": "#/$defs/uint" },
+                "overlayValue": { "$ref": "#/$defs/uint" },
+                "positionsValue": { "$ref": "#/$defs/uint" },
+                "grossAssets": { "$ref": "#/$defs/uint" },
+                "liabilities": { "$ref": "#/$defs/uint" },
+                "navSigned": { "$ref": "#/$defs/sint" },
+                "nav": { "$ref": "#/$defs/uint" },
+                "navDeficit": { "$ref": "#/$defs/uint" },
+                "totalSupply": { "$ref": "#/$defs/uint" },
+                "pps": { "$ref": "#/$defs/uint" },
+                "referencePps": { "oneOf": [{ "$ref": "#/$defs/uint" }, { "type": "null" }] }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "depositClaim": {
+      "type": "object",
+      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedAssets", "shares", "proof"],
+      "properties": {
+        "requestId": { "$ref": "#/$defs/uint" },
+        "owner": { "$ref": "#/$defs/address" },
+        "queuedEpoch": { "$ref": "#/$defs/uint" },
+        "settlementEpoch": { "$ref": "#/$defs/uint" },
+        "queuedAssets": { "$ref": "#/$defs/uint" },
+        "shares": { "$ref": "#/$defs/uint" },
+        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" } }
+      },
+      "additionalProperties": false
+    },
+    "withdrawClaim": {
+      "type": "object",
+      "required": ["requestId", "owner", "queuedEpoch", "settlementEpoch", "queuedShares", "assets", "dustFloorApplied", "proof"],
+      "properties": {
+        "requestId": { "$ref": "#/$defs/uint" },
+        "owner": { "$ref": "#/$defs/address" },
+        "queuedEpoch": { "$ref": "#/$defs/uint" },
+        "settlementEpoch": { "$ref": "#/$defs/uint" },
+        "queuedShares": { "$ref": "#/$defs/uint" },
+        "assets": { "$ref": "#/$defs/uint" },
+        "dustFloorApplied": { "type": "boolean" },
+        "proof": { "type": "array", "items": { "$ref": "#/$defs/hash" } }
+      },
+      "additionalProperties": false
+    },
+    "settlementRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["settlement", "deposit", "withdraw", "excluded", "supersedesUnexecuted", "winddownPin"],
+          "properties": {
+            "schema": { "const": "pmvs/settlement-archive" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "settlement-archive" }, "epoch": { "$ref": "#/$defs/uint" } }, "required": ["epoch"] }
+              ]
+            },
+            "settlement": {
+              "type": "object",
+              "required": ["settlementProfile", "settlementVersion", "grossPps", "ppsFinal", "highWaterMark", "feeRate", "valuationRecord", "merkleProfile", "requestLiveness"],
+              "properties": {
+                "settlementProfile": { "type": "string", "minLength": 1 },
+                "settlementVersion": { "$ref": "#/$defs/uint" },
+                "grossPps": { "$ref": "#/$defs/uint" },
+                "ppsFinal": { "$ref": "#/$defs/uint" },
+                "highWaterMark": { "$ref": "#/$defs/uint" },
+                "feeRate": { "$ref": "#/$defs/uint" },
+                "valuationRecord": { "$ref": "#/$defs/hash" },
+                "merkleProfile": { "type": "string", "minLength": 1 },
+                "requestLiveness": { "enum": ["bounded", "operator-dependent"] }
+              },
+              "additionalProperties": false
+            },
+            "deposit": {
+              "type": "object",
+              "required": ["requestIds", "root", "totalAssets", "totalShares", "claims"],
+              "properties": {
+                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/uint" } },
+                "root": { "$ref": "#/$defs/hash" },
+                "totalAssets": { "$ref": "#/$defs/uint" },
+                "totalShares": { "$ref": "#/$defs/uint" },
+                "claims": { "type": "array", "items": { "$ref": "#/$defs/depositClaim" } }
+              },
+              "additionalProperties": false
+            },
+            "withdraw": {
+              "type": "object",
+              "required": ["requestIds", "root", "totalShares", "totalAssets", "claims"],
+              "properties": {
+                "requestIds": { "type": "array", "items": { "$ref": "#/$defs/uint" } },
+                "root": { "$ref": "#/$defs/hash" },
+                "totalShares": { "$ref": "#/$defs/uint" },
+                "totalAssets": { "$ref": "#/$defs/uint" },
+                "claims": { "type": "array", "items": { "$ref": "#/$defs/withdrawClaim" } }
+              },
+              "additionalProperties": false
+            },
+            "excluded": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["leg", "requestId", "reason"],
+                "properties": {
+                  "leg": { "enum": ["deposit", "withdraw"] },
+                  "requestId": { "$ref": "#/$defs/uint" },
+                  "reason": { "enum": ["zero_output", "carried_forward", "cancelled", "policy_block"] }
+                },
+                "additionalProperties": false
+              }
+            },
+            "supersedesUnexecuted": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+            "winddownPin": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "receiptRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["archiveHash", "transaction", "observed", "retirement"],
+          "properties": {
+            "schema": { "const": "pmvs/settlement-receipt" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "receipt" }, "epoch": { "$ref": "#/$defs/uint" } }, "required": ["epoch"] }
+              ]
+            },
+            "archiveHash": { "$ref": "#/$defs/hash" },
+            "transaction": {
+              "type": "object",
+              "required": ["hash", "blockNumber", "blockHash", "transactionIndex", "events"],
+              "properties": {
+                "hash": { "$ref": "#/$defs/hash" },
+                "blockNumber": { "$ref": "#/$defs/uint" },
+                "blockHash": { "$ref": "#/$defs/hash" },
+                "transactionIndex": { "$ref": "#/$defs/uint" },
+                "events": { "type": "array", "items": { "type": "object" } }
+              },
+              "additionalProperties": false
+            },
+            "observed": {
+              "type": "object",
+              "required": ["ppsFinal", "feeSharesMinted", "finalFeeAssets", "totalSupplyBefore", "totalSupplyAfter", "assetBalances"],
+              "properties": {
+                "ppsFinal": { "$ref": "#/$defs/uint" },
+                "feeSharesMinted": { "$ref": "#/$defs/uint" },
+                "finalFeeAssets": { "$ref": "#/$defs/uint" },
+                "totalSupplyBefore": { "$ref": "#/$defs/uint" },
+                "totalSupplyAfter": { "$ref": "#/$defs/uint" },
+                "assetBalances": { "type": "array", "items": { "type": "object" } }
+              },
+              "additionalProperties": false
+            },
+            "retirement": {
+              "type": "object",
+              "required": ["triggered", "reason"],
+              "properties": {
+                "triggered": { "type": "boolean" },
+                "reason": { "oneOf": [{ "type": "string" }, { "type": "null" }] }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "gapRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["slot", "reason", "explanation"],
+          "properties": {
+            "schema": { "const": "pmvs/gap" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "gap" }, "slot": { "$ref": "#/$defs/uint" } }, "required": ["slot"] }
+              ]
+            },
+            "slot": { "$ref": "#/$defs/uint" },
+            "reason": { "enum": ["venue_unavailable", "chain_unavailable", "operator_unavailable", "unsafe_capture", "storage_unavailable", "other"] },
+            "explanation": { "type": "string", "minLength": 1 }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "correctionRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["targetHash", "reasonCode", "explanation", "changesSettlementBearingOutput", "replacement", "onchainEffect", "remediation"],
+          "properties": {
+            "schema": { "const": "pmvs/correction" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "correction" } } }
+              ]
+            },
+            "targetHash": { "$ref": "#/$defs/hash" },
+            "reasonCode": { "enum": ["clerical", "source", "methodology", "execution", "authority", "other"] },
+            "explanation": { "type": "string", "minLength": 1 },
+            "changesSettlementBearingOutput": { "type": "boolean" },
+            "replacement": {},
+            "onchainEffect": { "type": "string" },
+            "remediation": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "winddownRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["reason", "openedAt", "gates", "openPositionsPlan", "pendingRequestsPlan", "reversalRule"],
+          "properties": {
+            "schema": { "const": "pmvs/winddown-opened" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "winddown-opened" } } }
+              ]
+            },
+            "reason": { "type": "string", "minLength": 1 },
+            "openedAt": { "$ref": "#/$defs/uint" },
+            "gates": { "type": "object" },
+            "openPositionsPlan": { "type": "string", "minLength": 1 },
+            "pendingRequestsPlan": { "type": "string", "minLength": 1 },
+            "reversalRule": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "pinRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["grossPps", "netPps", "highWaterMark", "feeRate", "firstEpoch", "reserveAssets", "dustReserveAssets", "residualPolicy"],
+          "properties": {
+            "schema": { "const": "pmvs/retirement-pin" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "retirement-pin" } } }
+              ]
+            },
+            "grossPps": { "$ref": "#/$defs/uint" },
+            "netPps": { "$ref": "#/$defs/uint" },
+            "highWaterMark": { "$ref": "#/$defs/uint" },
+            "feeRate": { "$ref": "#/$defs/uint" },
+            "firstEpoch": { "$ref": "#/$defs/uint" },
+            "reserveAssets": { "$ref": "#/$defs/uint" },
+            "dustReserveAssets": { "$ref": "#/$defs/uint" },
+            "residualPolicy": { "type": "string", "minLength": 1 }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "finalRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["scope", "reason", "lastArchiveHash", "finalSupply", "pendingRequests", "outstandingClaims", "claimFunding", "residualPositions", "residualCash", "liabilities", "recoveryPath", "migration"],
+          "properties": {
+            "schema": { "const": "pmvs/retirement-final" },
+            "context": {
+              "allOf": [
+                { "$ref": "#/$defs/subjectContext" },
+                { "type": "object", "properties": { "kind": { "const": "retirement-final" } } }
+              ]
+            },
+            "scope": { "enum": ["generation", "subject"] },
+            "reason": { "enum": ["supply-exhausted", "zero-nav", "superseded", "governance-closure", "other"] },
+            "lastArchiveHash": { "$ref": "#/$defs/hash" },
+            "finalSupply": { "$ref": "#/$defs/uint" },
+            "pendingRequests": { "$ref": "#/$defs/uint" },
+            "outstandingClaims": { "$ref": "#/$defs/uint" },
+            "claimFunding": { "$ref": "#/$defs/uint" },
+            "residualPositions": { "type": "array", "items": { "type": "object" } },
+            "residualCash": { "type": "array", "items": { "type": "object" } },
+            "liabilities": { "type": "array", "items": { "type": "object" } },
+            "recoveryPath": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+            "migration": { "oneOf": [{ "type": "object" }, { "type": "null" }] }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "watcherRecord": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/recordBase" },
+        {
+          "type": "object",
+          "required": ["window", "sampling", "venueState"],
+          "properties": {
+            "schema": { "const": "pmvs/watcher-observation" },
+            "context": { "$ref": "#/$defs/watcherContext" },
+            "window": {
+              "type": "object",
+              "required": ["id", "seedCommit", "seedReveal", "expectedSamples"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "seedCommit": { "$ref": "#/$defs/hash" },
+                "seedReveal": { "$ref": "#/$defs/hexData" },
+                "expectedSamples": { "$ref": "#/$defs/uint" }
+              },
+              "additionalProperties": false
+            },
+            "sampling": {
+              "type": "object",
+              "required": ["tokenSelectionRule", "candidateTokens", "selectedTokens"],
+              "properties": {
+                "tokenSelectionRule": { "type": "string", "minLength": 1 },
+                "candidateTokens": { "type": "array", "items": { "$ref": "#/$defs/uint" } },
+                "selectedTokens": { "type": "array", "items": { "$ref": "#/$defs/uint" } }
+              },
+              "additionalProperties": false
+            },
+            "venueState": {
+              "type": "object",
+              "required": ["profile", "books", "responses"],
+              "properties": {
+                "profile": { "type": "string", "minLength": 1 },
+                "books": { "type": "array", "items": { "type": "object" } },
+                "responses": { "type": "array", "items": { "$ref": "#/$defs/rawResponse" } }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "record": {
+      "oneOf": [
+        { "$ref": "#/$defs/componentsRecord" },
+        { "$ref": "#/$defs/valuationRecord" },
+        { "$ref": "#/$defs/settlementRecord" },
+        { "$ref": "#/$defs/receiptRecord" },
+        { "$ref": "#/$defs/gapRecord" },
+        { "$ref": "#/$defs/correctionRecord" },
+        { "$ref": "#/$defs/winddownRecord" },
+        { "$ref": "#/$defs/pinRecord" },
+        { "$ref": "#/$defs/finalRecord" },
+        { "$ref": "#/$defs/watcherRecord" }
+      ]
+    },
+    "attestation": {
+      "type": "object",
+      "required": ["recordHash", "scheme", "verifyingContract", "streamId", "previousAnchor", "signer", "signature"],
+      "properties": {
+        "recordHash": { "$ref": "#/$defs/hash" },
+        "scheme": { "enum": ["eip712-ecdsa", "eip712-erc1271"] },
+        "verifyingContract": { "$ref": "#/$defs/address" },
+        "streamId": { "$ref": "#/$defs/hash" },
+        "previousAnchor": { "$ref": "#/$defs/hash" },
+        "signer": { "$ref": "#/$defs/address" },
+        "signature": { "$ref": "#/$defs/hexData" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

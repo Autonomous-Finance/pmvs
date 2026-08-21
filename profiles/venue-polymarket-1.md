@@ -4,13 +4,13 @@
 pmvs-part:      profile (venue)
 profile-id:     venue/polymarket/1
 version:        1 (draft)
-status:         Draft
+status:         Pre-EIP review draft
 author:         Ivan Morozov (Zeit Finance)
 created:        2026-08-18
-requires:       PMVS Parts I–III
+requires:       PMVS Parts I through III
 ```
 
-Venue profiles are versioned and explicitly mutable. The venue is a live, centralized service whose contracts, endpoints, and fee rules change on its own schedule. Everything venue-specific is pinned here, per profile version, and never in the PMVS core: a venue change produces `venue/polymarket/2`, not an edit to Parts I through III. Records name the exact profile id they were captured under, and verifiers without that id return `UNSUPPORTED_PROFILE`.
+Venue facts can change while the PMVS core remains stable. This draft was checked against Polymarket's primary documentation on 2026-08-21. Once this profile is released, a material contract, API, collateral, or fee change creates a new profile id. Old records keep this one.
 
 A venue profile must supply the three capabilities Parts II and III consume: observable inventory (position tokens whose balances are on-chain readable), an executable bid surface (a displayed order book to cross), and a resolution signal (an on-chain finality and payout source). Venues without a limit-order book (AMM or RFQ venues) cannot reuse this profile's cross mark; they need their own profile defining the settlement-bearing mark.
 
@@ -21,18 +21,33 @@ A venue profile must supply the three capabilities Parts II and III consume: obs
 | Conditional Tokens Framework (ERC-1155 positions) | `0x4d97dcd97ec945f40cf65f87097ace5ea0476045` |
 | CTF Exchange | `0xe111180000d2663c0091e4f400237545b87b996b` |
 | Neg-risk Exchange | `0xe2222d279d744050d28e00520010520000310f59` |
-| Neg-risk Adapter | `0xd91e80cf2e7be2e162c6513ced06f1dd0da35296` |
+| Neg-risk Adapter, CLOB v1, deprecated | `0xd91e80cf2e7be2e162c6513ced06f1dd0da35296` |
+| pUSD proxy | `0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb` |
+| pUSD implementation (observed 2026-08-21) | `0x6bbcef9f7ef3b6c592c99e0f206a0de94ad0925f` |
 | Collateral onramp (USDC.e to venue dollar) | `0x93070a847efef7f70739046a929d47a521f5b8ee` |
 | Collateral offramp (venue dollar to USDC.e) | `0x2957922eb93258b93368531d39facca3b4dc5854` |
+| CTF Collateral Adapter | `0xada100db00ca00073811820692005400218fce1f` |
+| Neg-risk CTF Collateral Adapter | `0xada2005600dec949baf300f4c6120000bdb6eaab` |
 
-Collateral registry (both 6 decimals): the venue dollar pUSD `0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb` and USDC.e `0x2791bca1f2de4661ed88a30c99a7a9449aa84174`. Conversion rule: 1:1 par for NAV purposes. A market depeg between them is a disclosure event; the record lists each token separately, so the par assumption stays visible and revisable by profile version.
+The collateral registry contains two 6-decimal tokens: pUSD at the proxy above and USDC.e at `0x2791bca1f2de4661ed88a30c99a7a9449aa84174`. Polymarket documents pUSD as a USDC claim and supplies amount-preserving wrap and unwrap calls. The pinned pUSD source also exposes role-gated minting and owner-authorized upgrades. PMVS therefore does not treat the documentation alone as proof of current redeemability.
+
+Under this profile, converting pUSD amounts to USDC.e at 1:1 is an explicit risk assumption. A fresh valuation supports that assumption only when pinned chain reads establish all of these facts:
+
+1. The component record matches the proxy implementation, proxy authority, pUSD implementation code, ramp code, and ramp authority state.
+2. pUSD reports 6 decimals and its immutable `USDCE()` value equals USDC.e.
+3. The offramp reports `COLLATERAL_TOKEN() == pUSD`, has the required pUSD wrapper role, and reports `paused(USDC.e) == false`.
+4. `USDC.e.balanceOf(pUSD.VAULT())` and `USDC.e.allowance(pUSD.VAULT(), pUSD)` each cover all outstanding pUSD supply at the pinned block.
+5. A deposit path that wraps USDC.e also checks the onramp's pUSD address, wrapper role, and USDC.e pause state.
+
+A failed read, pause, role mismatch, code change, authority change, or reserve shortfall blocks fresh settlement under this profile. It does not turn pUSD or a pUSD-denominated position into zero. The record lists pUSD and USDC.e balances separately. These checks prove state at one block only. They do not guarantee that the backing or ramp stays available until a later payout, so records state this residual collateral risk.
 
 Custody pattern: a per-vault venue-relayed Safe-style wallet holds positions and venue collateral. Its address is on-chain discoverable, and it is the account the inventory rules of Part III reconstruct. Position token ids are CTF position ids (`uint256`); neg-risk wrapped positions resolve to CTF ids for balance purposes.
 
 ## Inventory (Part III bindings)
 
-- Transfer-log reconstruction runs over the CTF contract (`TransferSingle` and `TransferBatch`) and any neg-risk wrapper contracts listed above, from the custody account's inception checkpoint.
+- Transfer-log reconstruction runs over the CTF contract (`TransferSingle` and `TransferBatch`) from each custody account's proved checkpoint. Another ERC-1155 contract is included only when a later profile revision lists its address and balance method.
 - Quantities come from `balanceOfBatch` on the CTF at the pinned valuation block. Venue Data-API sizes are `venueReportedSize` metadata only.
+- Each position entry records `collateralToken`, `parentCollectionId`, `conditionId`, and `indexSet`. The verifier recomputes the CTF collection id and position id and requires the result to equal the book's `asset_id`. This binds its payout asset and outcome index to the held ERC-1155 id.
 - The Data API (`https://data-api.polymarket.com/positions`) applies server-side size filters. Because API sizes are non-normative this only affects metadata completeness, and capture MUST NOT apply any API-side filter to the normative set.
 
 ## Book capture (the executable bid surface)
@@ -48,26 +63,39 @@ Source: the CLOB API (`https://clob.polymarket.com`), `GET /book?token_id=…` p
  │ 0.37         │ 500     │  1050   ← capture (first level reaching size)
  │ 0.30         │ 800     │         ── may stop here; bidsTruncated: true
  └──────────────┴─────────┘
- If total displayed depth < size: capture the ENTIRE bid side —
+ If total displayed depth < size: capture the ENTIRE bid side.
  "unfilled remainder = 0" is only provable against an exhausted ladder.
 ```
 
 1. **Raw-response preservation.** The exact response bytes of every book read that feeds a record MUST be retained and content-addressed: the hash goes in the record, and the bytes stay retrievable as a sidecar object under the storage profile. Normalized integer inputs (the ladders the engine consumes) are published inside the record, and the original decimal lexemes survive in the raw sidecar. Normalization is lossy, and only raw bytes can support later re-examination of a capture dispute.
-2. **Ladder depth.** Bids MUST be captured from the best price downward through and including the first level at which cumulative bid quantity reaches the position's mark quantity. If total displayed depth is smaller, the entire bid side MUST be captured. `bidsTruncated: true` is only lawful when the cross fully filled within the captured depth. Under-capture is an `INCOMPLETE_INVENTORY`-class malformation of the record.
+2. **Ladder depth.** Bids MUST be captured from the best price downward through and including the first level at which cumulative bid quantity reaches the position's mark quantity. If total displayed depth is smaller, the entire bid side MUST be captured. `bidsTruncated: true` is lawful only when the cross fully filled within the captured depth. Under-capture is `INCOMPLETE_CAPTURE`.
 3. Normalization: prices to `priceU6` in `[0, 10^6]`, quantities to base units, duplicate levels merged, strict descending order. Malformed levels (non-numeric, negative, a zero-price bid) invalidate the capture for that token: `DATA_UNAVAILABLE`, not "empty book". Ask-side capture is NOT required, since the cross mark never reads asks; implementations MAY retain asks in the raw sidecar only.
-4. **Venue correlation fields.** The book response's `hash`, `timestamp`, and `tick_size`/`min_order_size` fields MUST be copied into the record verbatim as opaque strings. The venue documents its book hash as a change identifier, not a signed authenticity proof, and a normalized or truncated ladder cannot recompute it. Verifiers MUST treat these fields as correlation anchors (exact-match comparison against watcher observations) and MUST NOT attempt to validate them structurally.
+4. **Venue correlation fields.** Copy `market`, `asset_id`, `timestamp`, `hash`, `min_order_size`, `tick_size`, `neg_risk`, and `last_trade_price` from the response. Preserve their JSON types and lexemes in the raw sidecar. The hash is not a venue signature. A verifier treats it as an opaque correlation value and does not try to derive it from a truncated ladder.
 5. Per-token capture timing follows Part III: request start and response end recorded, skew bounds applied.
 
 ## Resolution signal
 
-- Finality: CTF condition resolution (payout numerators and denominator reported on-chain), plus the neg-risk adapter's determination for neg-risk markets.
-- Redemption-mark inputs (Part III): pinned-block payout numerators and denominator per condition.
-- Redemption execution: standard CTF redemption; neg-risk positions redeem through the adapter with `indexSet = 1 << outcomeIndex`.
+- Finality: the CTF reports a nonzero payout denominator for the recorded condition id. This profile does not infer finality from an upstream UMA adapter or an API flag.
+- Redemption-mark inputs: pinned-block payout numerators and denominator for the position's recorded `conditionId` and `indexSet`.
+- Redemption execution: direct CTF redemption or the applicable CTF Collateral Adapter listed above. The record names the route, pins its code, and records the exact calldata and resulting collateral.
 - Market metadata from venue APIs (closed flags, end dates) is context only and never a resolution authority.
 
 ## Venue fees
 
-Polymarket applies taker fees per market with dynamically queryable parameters. The fee for a fill of size `s` at price `p` follows the venue's on-chain calculator shape, `fee = s · rate · (p·(1−p))^e`, summed per matched level. The facts this profile version pins: fee parameters are per-market and mutable by the venue, so a fee-netted mark cannot be part of PMVS-M1. It is reserved for PMVS-M2, which will pin an exact fee-resolution procedure and a fail-safe ceiling. Records under this profile carry gross cross marks; any fee estimation an implementation performs is out of record scope.
+Current venue documentation gives the expected taker-fee shape `fee = shares * feeRate * price * (1 - price)`. It says rates vary by market category, makers pay no fee, and fees round to five decimal places. Those API-level facts are mutable. The exchange contract instead enforces an on-chain upper bound through `getMaxFeeRate()` in basis points.
+
+For a vault selling one position as a taker, this profile defines:
+
+```
+maxFeeRateBps = exchange.getMaxFeeRate() at the pinned block
+require 1 <= maxFeeRateBps <= 9_999
+venueExitCost = floor(grossMark * maxFeeRateBps / 10_000)
+mark          = grossMark - venueExitCost
+```
+
+The position entry names the exchange route. The record pins its code and the `getMaxFeeRate()` return value. In the pinned contract, zero disables the limit rather than the fee, so zero cannot support an M1 mark. A failed call, value outside `[1, 9999]`, or unknown route is `DATA_UNAVAILABLE`. This cost is the largest fee the pinned exchange configuration permits, not a prediction of the fee the operator will quote. It is intentionally more conservative than the category formula. A later fee-cap change triggers M1's rebuild rule.
+
+Vector in 6-decimal collateral units: `grossMark = 50000000` and `maxFeeRateBps = 500` gives `venueExitCost = 2500000` and `mark = 47500000`. A one-unit gross mark at the same cap has zero cost after the contract's floor.
 
 ## Degraded modes (venue outage or shutdown)
 
@@ -75,7 +103,19 @@ The venue is a single centralized service, so its unavailability is a first-clas
 
 1. An API outage is `DATA_UNAVAILABLE` per Part III. An outage MUST NOT produce empty books, empty inventories, or zero marks, and no settlement that requires fresh valuation may execute against captures stale beyond their bounds.
 2. A prolonged outage or announced shutdown triggers the deployment's declared degraded mode: block valuation-dependent deposits and rolls, and keep cancellation and claim paths open, since they need no venue. Where positions can still resolve on-chain (CTF resolution is on-chain), a resolution-only recovery MAY value and redeem resolved positions from chain state alone and wind the vault down under Part II's retirement records.
-3. A venue shutdown never justifies marking open positions to zero. Unresolvable positions under a dead venue are a disclosed side pocket in wind-down, valued per whatever recovery the deployment can document.
+3. A venue shutdown never justifies marking open positions to zero. A side pocket requires a separate profile that allocates its rights before new flows. Without one, unresolved material positions block settlement and enter wind-down disclosure.
+
+## Primary references
+
+- [Polymarket contract addresses](https://docs.polymarket.com/resources/contracts)
+- [Order-book response](https://docs.polymarket.com/api-reference/market-data/get-order-book)
+- [pUSD wrapping and unwrapping](https://docs.polymarket.com/concepts/pusd)
+- [CollateralToken source at `ccc0596`](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/collateral/CollateralToken.sol)
+- [CollateralOfframp source at `ccc0596`](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/collateral/CollateralOfframp.sol)
+- [Exchange fee cap source at `ccc0596`](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/exchange/mixins/Fees.sol)
+- [Exchange sell-fee settlement at `ccc0596`](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/exchange/mixins/Trading.sol)
+- [Resolution and redemption](https://docs.polymarket.com/concepts/resolution)
+- [Trading fees](https://docs.polymarket.com/trading/fees)
 
 ## Data-rights note (non-normative)
 

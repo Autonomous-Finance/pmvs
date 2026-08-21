@@ -4,46 +4,56 @@
 pmvs-part:      profile (watcher)
 profile-id:     watcher/0
 version:        0 (experimental draft)
-status:         Draft — statistical methodology explicitly unresolved
+status:         Experimental draft; alarm method unresolved
 author:         Ivan Morozov (Zeit Finance)
 created:        2026-08-18
 requires:       PMVS Parts I, III; a venue profile
 ```
 
-Watchers are independent parties who record their own contemporaneous venue observations so that operator-published venue inputs (Part I trust tier T3) can be corroborated. This profile splits deliberately: the observation format is stable and normative, while the statistical alarm methodology is experimental and will version separately once empirically validated. Nothing in this profile upgrades T3 beyond corroboration. The venue signs nothing, displayed liquidity is cancellable, and watcher agreement can be manufactured by collusion.
+Watchers record their own venue observations near an operator's capture. The observation format is normative for this draft. Statistical alarms remain experimental. Watcher agreement does not authenticate a venue response, and common control can manufacture agreement.
 
 ```
- operator capture ──▶ record R (venueState: books, venue hash fields)
-                              │
-                              │  compare within ±window
-                              ▼
- watcher samples ──▶ observations O₁, O₂, ... (own chain, own key)
-      exact venue-hash match with R?  ──yes──▶ strong corroboration
-      only temporal bracketing?       ──────▶ heuristic / INCONCLUSIVE
-      no eligible observation?        ──────▶ INCONCLUSIVE (no signal)
+operator record R ---- compare within the declared window
+                              |
+watcher records O1, O2 -------+
+
+same opaque book hash: exact correlation
+temporal bracket only: INCONCLUSIVE unless a named alarm method applies
+no eligible observation: INCONCLUSIVE
 ```
 
 ## Observation records (normative)
 
-A watcher publishes Part I envelopes with `kind: "watcher-observation"`, on its own per-watcher hash chain, attested by its own EVM key (Part I attestation, with `subjectId` naming the watched subject). The schema: subject; context (sequence, prev, observationTime plus unix ms); venueState in the same byte discipline as Part III capture, meaning per-token ladders (or full raw responses with hashes), venue correlation fields (`hash`, `timestamp`) verbatim, and request timing; plus the watcher's declared sampling parameters (window width, token-selection rule, randomization source). The tracked token set derives from the subject's latest published valuation record plus the venue's position listing for the custody account, and the derivation MUST be recorded.
+A watcher publishes a Part I envelope with `kind: "watcher-observation"`, `stream: "watcher"`, and `producer` equal to its signer. Its stream is keyed by `(subjectId, producer)`. The record contains observation time, request start and end, token-selection rule, sampling-window id, raw response hashes and locations, normalized ladders, and venue correlation fields. The watcher derives candidate tokens from the latest subject valuation and venue listing. It records that derivation and any sampled subset.
 
-Sampling MUST be time-randomized within declared windows (uniform within each window of at most `watcherWindowSeconds`). The randomization seed handling SHOULD be commit-reveal so an operator cannot learn sampling instants in advance. Publication latency bounds and storage-profile rules apply as they do for operator records.
+Sampling MUST be time-randomized within declared windows. Before a window starts, the watcher anchors a commitment to the seed, window, selection rule, and expected sample count. It reveals the seed after the window. Every scheduled sample receives an observation or an explicit watcher gap. Omitting a failed or unfavorable sample reduces coverage. A W designation requires watcher anchors within the declared latency; signatures without timely anchors do not establish observation order.
 
 ## Corroboration (normative, weak claims only)
 
 For an operator record R at capture time t and position i:
 
-1. **Exact correlation match.** If any watcher observation within plus or minus `watcherWindowSeconds` of t carries a venue correlation field (the book `hash`) byte-equal to R's for token i, that book is strongly corroborated: the venue reported the same book state to an independent party near t. Exact matches are the highest-value signal this profile produces.
+1. **Exact correlation match.** If an eligible watcher observation near time `t` carries a book `hash` byte-equal to the operator record for the same token, both captures report the same opaque venue correlation value. This is the clearest signal the profile produces. It does not prove the book was true or independently generated.
 2. **Temporal bracketing (heuristic).** Without an exact match, watcher observations bracketing t bound nothing formally, because a book can change arbitrarily between two observations. Bracket comparisons (crossing R's position size into the bracketing ladders and comparing marks) are heuristic evidence and MUST be labeled `INCONCLUSIVE` unless the experimental alarm methodology below is explicitly invoked, with its version named.
-3. No eligible observations means `INCONCLUSIVE`. Non-detection is never evidence of correctness: an unwatched or thinly watched subject simply has no T3 signal.
+3. No eligible observations means `INCONCLUSIVE`. Non-detection is never evidence of correctness: an unwatched or thinly watched subject has no T3 signal.
 
 ## Alarm methodology (EXPERIMENTAL, not a conformance surface)
 
-A defensible bias detector must define the sampled population and eligibility windows, a minimum sample count, the test statistic and its null hypothesis under book-dynamics noise, significance and power targets, autocorrelation handling (books are strongly autocorrelated, so consecutive observations are not independent draws), multiple-testing correction across positions and records, missing-data treatment, and a NAV-weighted effect size (a large relative deviation on a negligible position is not a material event, while a small one on a concentrated position is). None of these are fixed in version 0. Deployments experimenting with alarms MUST publish the full parameterization alongside any `FIDELITY_SUSPECT` output, and such output is evidence for human investigation, never an automated conformance verdict.
+A bias detector needs all of these declared inputs:
+
+- sampled population and eligibility windows;
+- minimum sample count;
+- test statistic and null hypothesis under book-dynamics noise;
+- significance and power targets;
+- autocorrelation treatment, because consecutive book observations are not independent draws;
+- multiple-testing correction across positions and records;
+- missing-data treatment; and
+- a NAV-weighted effect size, so a large deviation on a negligible position is not confused with a small deviation on a concentrated position.
+
+Version 0 fixes none of those choices. A deployment that experiments with alarms MUST publish the full parameter set with any `FIDELITY_SUSPECT` output. That output can prompt human investigation. It is never an automated conformance verdict.
 
 ## Independence and reporting
 
-One watcher under the operator's own administration corroborates nothing. The designation reported per Part I is always parameterized, `W(n, coverage, window, diversity)`: the number of watchers, the fraction of records with eligible observations, the evaluation window, and an administration-diversity statement covering who runs them and on what infrastructure. Sybil resistance is organizational, not cryptographic. The diversity statement is a human-auditable claim and MUST say so.
+A watcher under the operator's administration does not count as independent. `W(n, coverage, window, diversity)` reports eligible watchers, scheduled-sample coverage, the evaluation window, and an administrative and infrastructure-diversity statement. Sybil resistance here is organizational, not cryptographic. The report lists missed samples and common API, cloud, gateway, and key-control dependencies.
 
 ## Copyright
 
