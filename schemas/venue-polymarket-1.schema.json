@@ -1,0 +1,1852 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/venue-polymarket-1.schema.json",
+  "title": "PMVS Polymarket venue state profile v1",
+  "description": "Machine shape for the Polymarket-specific custody, market, collateral, order, redemption, and settlement-freeze evidence used by the included backend.",
+  "type": "object",
+  "required": [
+    "profile",
+    "custodyConfigs",
+    "positions",
+    "books",
+    "routeConfigs",
+    "standardOracleConfigs",
+    "negRiskConfigs",
+    "redemptionConfigs",
+    "redemptionExecutions",
+    "orderCommitments",
+    "settlementFreezeConfigs",
+    "collateralConfig",
+    "wrappedCollateralConfig",
+    "erc1155Approvals",
+    "erc20Allowances",
+    "authorities",
+    "responses"
+  ],
+  "properties": {
+    "profile": { "const": "venue/polymarket/1" },
+    "custodyConfigs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/depositWalletCustodyConfig" },
+          { "$ref": "#/$defs/legacySafeCustodyConfig" }
+        ]
+      },
+      "$comment": "IDs are unique and entries are sorted by custodyConfigId; the PMVS verifier enforces both rules."
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/standardPositionEntry" },
+          { "$ref": "#/$defs/negativeRiskPositionEntry" }
+        ]
+      },
+      "$comment": "Entries are sorted by numeric positionId and then custodyConfigId. The PMVS verifier checks ID references, position/event equality, and set completeness."
+    },
+    "books": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/book" },
+      "$comment": "Exactly one entry is required per distinct held assetId whose condition has payoutDenominator 0 and therefore uses the displayed-book cross path. A resolved condition uses its pinned CTF payout vector and has no book entry. The PMVS verifier checks numeric ordering, response references, payout-state agreement, and position correlation."
+    },
+    "routeConfigs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/standardRouteConfig" },
+          { "$ref": "#/$defs/negativeRiskRouteConfig" }
+        ]
+      },
+      "$comment": "routeId values are unique and sorted; the PMVS verifier checks position references."
+    },
+    "standardOracleConfigs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/standardOracleV31Config" },
+          { "$ref": "#/$defs/standardOracleV4Config" }
+        ]
+      },
+      "$comment": "Config IDs are unique and sorted. The PMVS verifier checks question references and event equality."
+    },
+    "negRiskConfigs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/negativeRiskConfig" },
+      "$comment": "Config IDs are unique and sorted. The PMVS verifier checks low-byte derivation, reference equality, event equality, and questionIndex < questionCount."
+    },
+    "redemptionConfigs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/standardDirectRedemption" },
+          { "$ref": "#/$defs/standardAdapterRedemption" },
+          { "$ref": "#/$defs/negativeDirectRedemption" },
+          { "$ref": "#/$defs/negativeLegacyAdapterRedemption" },
+          { "$ref": "#/$defs/negativeCollateralAdapterRedemption" }
+        ]
+      },
+      "$comment": "Route IDs are unique and sorted. The PMVS verifier checks position references, call sequencing, entrypoint equality, sweep completeness, and final pUSD output."
+    },
+    "redemptionExecutions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/redemptionExecution" },
+      "$comment": "Execution IDs are unique. The PMVS verifier binds each executable valuation or zero-NAV recovery plan to one custody account, one condition, one redemption route, and exactly the held position IDs that the call plan consumes. A normal roll does not execute these calls inside its protected settlement transaction."
+    },
+    "orderCommitments": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": { "$ref": "#/$defs/orderCommitment" },
+      "$comment": "This is the bounded set of current active, unfilled V2 orders disclosed to the record. It does not prove that no undisclosed signature exists. The PMVS verifier checks order hashes, references, normalized signature-result fields, effective remaining amounts, reservation equations, uniqueness, and exact pinned reads for signatureValid and other onchain results."
+    },
+    "settlementFreezeConfigs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/settlementFreezeConfig" },
+      "$comment": "The PMVS verifier requires complete custody-and-route coverage and binds each predicate to exact reads. Version 1 permits only effective-user-pause in settlement scope; transfer-authorities-revoked is diagnostic because pUSD is upgradeable. Receipt and trace checks bind the protected call to the pre-anchor settlement call-plan hash and receipt-block runtime of a direct non-delegating enforcer. From the first pause read through completion, its call graph preserves every pause, makes no call into or from strategy custody, and makes no state-changing V2 call. Core funding sources are prefunded before capture and disjoint from strategy custody."
+    },
+    "collateralConfig": { "$ref": "#/$defs/collateralConfig" },
+    "wrappedCollateralConfig": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/wrappedCollateralConfig" }
+      ],
+      "$comment": "This value is non-null exactly when a negative-risk position is held; the PMVS verifier enforces the cross-array condition."
+    },
+    "erc1155Approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/erc1155Approval" },
+      "$comment": "The PMVS verifier checks candidate completeness, tuple ordering, and all-null versus all-present event provenance."
+    },
+    "erc20Allowances": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/erc20Allowance" },
+      "$comment": "The PMVS verifier checks candidate completeness, tuple ordering, and all-null versus all-present event provenance."
+    },
+    "authorities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/authority" },
+      "$comment": "The PMVS verifier checks tuple ordering and all-null versus all-present event provenance. In settlement scope, it also requires exact equality with an independently reconstructed expectedAuthorityIdentities set and an active wrapper role for the selected pUSD offramp."
+    },
+    "responses": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/response" },
+      "$comment": "responseHash values are unique; the PMVS verifier checks book references."
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "required": ["positions"],
+        "properties": {
+          "positions": {
+            "type": "array",
+            "contains": { "$ref": "#/$defs/negativeRiskPositionEntry" }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["wrappedCollateralConfig"],
+        "properties": {
+          "wrappedCollateralConfig": { "$ref": "#/$defs/wrappedCollateralConfig" }
+        }
+      },
+      "else": {
+        "type": "object",
+        "required": ["wrappedCollateralConfig"],
+        "properties": {
+          "wrappedCollateralConfig": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["custodyConfigs"],
+        "properties": {
+          "custodyConfigs": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "required": ["walletKind"],
+              "properties": { "walletKind": { "const": "deposit-wallet-v2" } }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["authorities"],
+        "properties": {
+          "authorities": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "required": ["contract", "role", "active"],
+              "properties": {
+                "contract": { "const": "0x00000000000fb5c9adea0298d729a0cb3823cc07" },
+                "role": { "const": "deposit-wallet-factory-upgrader" },
+                "active": { "const": true }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "JSON Schema closes the transport shape and fixed deployment discriminators. The PMVS verifier also enforces uint256 upper bounds, equality between arbitrary instance fields, unique IDs, reference resolution, ordering, set completeness, exposure equations, route/call correspondence, and bindings from normalized onchain values to unique exact target, calldata, return-data, and valuation-block reads in inputs.chainState.",
+  "$defs": {
+    "uint256": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "maxLength": 78,
+      "$comment": "uint256; the PMVS verifier enforces the exact upper bound."
+    },
+    "positiveUint256": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$",
+      "maxLength": 78,
+      "$comment": "positive uint256; the PMVS verifier enforces the exact upper bound."
+    },
+    "uint248": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "maxLength": 75,
+      "$comment": "uint248; the PMVS verifier enforces the exact upper bound."
+    },
+    "uint8": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+    },
+    "questionCount": {
+      "type": "string",
+      "pattern": "^(?:[2-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+    },
+    "basisPoints": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,3}|10000)$"
+    },
+    "maxFeeRateBps": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,3})$"
+    },
+    "u6Price": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,5}|1000000)$"
+    },
+    "positiveU6Price": {
+      "type": "string",
+      "pattern": "^(?:[1-9][0-9]{0,5}|1000000)$"
+    },
+    "address": { "type": "string", "pattern": "^0x[0-9a-f]{40}$" },
+    "nonzeroAddress": { "type": "string", "pattern": "^0x(?!0{40}$)[0-9a-f]{40}$" },
+    "bytes4": { "type": "string", "pattern": "^0x[0-9a-f]{8}$" },
+    "bytes32": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "nonzeroBytes32": { "type": "string", "pattern": "^0x(?!0{64}$)[0-9a-f]{64}$" },
+    "hexData": { "type": "string", "pattern": "^0x(?:[0-9a-f]{2})*$" },
+    "nonemptyHexData": { "type": "string", "pattern": "^0x(?:[0-9a-f]{2})+$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "nonemptyString": { "type": "string", "minLength": 1 },
+    "nullableAddress": {
+      "oneOf": [
+        { "$ref": "#/$defs/address" },
+        { "type": "null" }
+      ]
+    },
+    "nullableBytes32": {
+      "oneOf": [
+        { "$ref": "#/$defs/bytes32" },
+        { "type": "null" }
+      ]
+    },
+    "nullableUint256": {
+      "oneOf": [
+        { "$ref": "#/$defs/uint256" },
+        { "type": "null" }
+      ]
+    },
+    "conditionPreparation": {
+      "type": "object",
+      "required": [
+        "blockNumber",
+        "blockHash",
+        "transactionHash",
+        "logIndex",
+        "oracle",
+        "questionId",
+        "outcomeSlotCount"
+      ],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" },
+        "oracle": { "$ref": "#/$defs/nonzeroAddress" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "outcomeSlotCount": { "const": "2" }
+      },
+      "additionalProperties": false
+    },
+    "eventLocation": {
+      "type": "object",
+      "required": ["blockNumber", "blockHash", "transactionHash", "logIndex"],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false
+    },
+    "adapterMarketPreparedEvent": {
+      "type": "object",
+      "required": ["blockNumber", "blockHash", "transactionHash", "logIndex", "marketId", "oracle", "feeBps", "data"],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" },
+        "marketId": { "$ref": "#/$defs/bytes32" },
+        "oracle": { "$ref": "#/$defs/nonzeroAddress" },
+        "feeBps": { "$ref": "#/$defs/basisPoints" },
+        "data": { "$ref": "#/$defs/hexData" }
+      },
+      "additionalProperties": false
+    },
+    "adapterQuestionPreparedEvent": {
+      "type": "object",
+      "required": ["blockNumber", "blockHash", "transactionHash", "logIndex", "marketId", "questionId", "questionIndex", "data"],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" },
+        "marketId": { "$ref": "#/$defs/bytes32" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "questionIndex": { "$ref": "#/$defs/uint8" },
+        "data": { "$ref": "#/$defs/hexData" }
+      },
+      "additionalProperties": false
+    },
+    "operatorMarketPreparedEvent": {
+      "type": "object",
+      "required": ["blockNumber", "blockHash", "transactionHash", "logIndex", "marketId", "feeBps", "data"],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" },
+        "marketId": { "$ref": "#/$defs/bytes32" },
+        "feeBps": { "$ref": "#/$defs/basisPoints" },
+        "data": { "$ref": "#/$defs/hexData" }
+      },
+      "additionalProperties": false
+    },
+    "operatorQuestionPreparedEvent": {
+      "type": "object",
+      "required": ["blockNumber", "blockHash", "transactionHash", "logIndex", "marketId", "questionId", "requestId", "questionIndex", "data"],
+      "properties": {
+        "blockNumber": { "$ref": "#/$defs/uint256" },
+        "blockHash": { "$ref": "#/$defs/bytes32" },
+        "transactionHash": { "$ref": "#/$defs/bytes32" },
+        "logIndex": { "$ref": "#/$defs/uint256" },
+        "marketId": { "$ref": "#/$defs/bytes32" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "requestId": { "$ref": "#/$defs/bytes32" },
+        "questionIndex": { "$ref": "#/$defs/uint8" },
+        "data": { "$ref": "#/$defs/hexData" }
+      },
+      "additionalProperties": false
+    },
+    "redemptionCall": {
+      "oneOf": [
+        { "$ref": "#/$defs/exactRedemptionCall" },
+        { "$ref": "#/$defs/resolutionDependentRedemptionCall" }
+      ]
+    },
+    "exactRedemptionCall": {
+      "type": "object",
+      "required": ["target", "value", "calldataState", "calldata", "expectedOutputToken", "minimumOutputAmount"],
+      "properties": {
+        "target": { "$ref": "#/$defs/nonzeroAddress" },
+        "value": { "$ref": "#/$defs/uint256" },
+        "calldataState": { "const": "exact" },
+        "calldata": { "$ref": "#/$defs/hexData" },
+        "expectedOutputToken": { "$ref": "#/$defs/nonzeroAddress" },
+        "minimumOutputAmount": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false
+    },
+    "resolutionDependentRedemptionCall": {
+      "type": "object",
+      "required": ["target", "value", "calldataState", "calldata", "expectedOutputToken", "minimumOutputAmount"],
+      "properties": {
+        "target": { "$ref": "#/$defs/nonzeroAddress" },
+        "value": { "$ref": "#/$defs/uint256" },
+        "calldataState": { "const": "resolution-dependent" },
+        "calldata": { "type": "null" },
+        "expectedOutputToken": { "$ref": "#/$defs/nonzeroAddress" },
+        "minimumOutputAmount": { "const": "0" }
+      },
+      "additionalProperties": false
+    },
+    "redemptionExecution": {
+      "type": "object",
+      "required": [
+        "redemptionExecutionId",
+        "custodyConfigId",
+        "marketKind",
+        "conditionId",
+        "payoutNumerators",
+        "payoutDenominator",
+        "redemptionRouteId",
+        "coveredPositionIds",
+        "redemptionCalls"
+      ],
+      "properties": {
+        "redemptionExecutionId": { "$ref": "#/$defs/nonemptyString" },
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "enum": ["standard", "negative-risk"] },
+        "conditionId": { "$ref": "#/$defs/bytes32" },
+        "payoutNumerators": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/uint256" }
+        },
+        "payoutDenominator": { "$ref": "#/$defs/uint256" },
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "coveredPositionIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uint256" }
+        },
+        "redemptionCalls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/redemptionCall" }
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "The PMVS verifier resolves every reference, binds the execution to one custody and condition, requires exact position-set coverage, and forbids any position from being consumed by more than one execution. The two payout numerators and denominator are exact CTF reads at the valuation block. Denominator 0 requires two zero numerators and selects the displayed-book cross mark. A positive denominator requires a valid payout vector, selects redemption valuation, and binds the exact call-plan output."
+    },
+    "settlementPredicateRead": {
+      "type": "object",
+      "required": ["target", "calldata", "expectedReturnData"],
+      "properties": {
+        "target": { "$ref": "#/$defs/nonzeroAddress" },
+        "calldata": { "$ref": "#/$defs/nonemptyHexData" },
+        "expectedReturnData": { "$ref": "#/$defs/nonemptyHexData" }
+      },
+      "additionalProperties": false
+    },
+    "settlementFreezeConfig": {
+      "type": "object",
+      "required": [
+        "freezeConfigId",
+        "custodyConfigId",
+        "routeId",
+        "predicate",
+        "enforcementMode",
+        "predicateReads",
+        "enforcer",
+        "enforcerCodeHash",
+        "settlementFunctionSelector",
+        "settlementCallPlanHash",
+        "enforcerSourceCommit"
+      ],
+      "properties": {
+        "freezeConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "predicate": { "enum": ["effective-user-pause", "transfer-authorities-revoked"] },
+        "enforcementMode": { "const": "settlement-transaction-precondition" },
+        "predicateReads": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/settlementPredicateRead" }
+        },
+        "enforcer": { "$ref": "#/$defs/nonzeroAddress" },
+        "enforcerCodeHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "settlementFunctionSelector": {
+          "enum": ["0x0572cba6", "0x81c7d9c6", "0x894b93e1", "0xa1ca4aa2"],
+          "$comment": "Registry uses rollEpoch or rollEpochZeroNav; atomic mode uses the corresponding WithAnchor function. The outer verifier binds the selector to profiles.anchorMode."
+        },
+        "settlementCallPlanHash": {
+          "$ref": "#/$defs/bytes32",
+          "$comment": "The domain-separated pre-anchor hash defined by venue/polymarket/1. It binds chain, enforcer, selector, epoch, attempt, branch, request-id hashes, roots, and totals. It excludes PMVSAnchorInput, record hash, URI, and signature."
+        },
+        "enforcerSourceCommit": { "$ref": "#/$defs/gitCommit" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "required": ["predicate"],
+            "properties": { "predicate": { "const": "effective-user-pause" } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["predicateReads"],
+            "properties": {
+              "predicateReads": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "prefixItems": [
+                  {
+                    "type": "object",
+                    "required": ["target", "expectedReturnData"],
+                    "properties": {
+                      "target": {
+                        "enum": [
+                          "0xe111180000d2663c0091e4f400237545b87b996b",
+                          "0xe2222d279d744050d28e00520010520000310f59"
+                        ]
+                      },
+                      "calldata": { "type": "string", "pattern": "^0x28872101[0-9a-f]{64}$" },
+                      "expectedReturnData": { "const": "0x0000000000000000000000000000000000000000000000000000000000000001" }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "required": ["predicateReads"],
+            "properties": {
+              "predicateReads": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "object",
+                    "required": ["target", "expectedReturnData"],
+                    "properties": {
+                      "target": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+                      "calldata": { "type": "string", "pattern": "^0xe985e9c5[0-9a-f]{128}$" },
+                      "expectedReturnData": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["target", "expectedReturnData"],
+                    "properties": {
+                      "target": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+                      "calldata": { "type": "string", "pattern": "^0xdd62ed3e[0-9a-f]{128}$" },
+                      "expectedReturnData": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "$comment": "The enforcer must evaluate the exact predicate reads in the same transaction before it can settle. A point-in-time pause or allowance observation is not a freeze. The PMVS verifier binds coverage, exact read calldata, expected return values, selector, pre-anchor settlement call plan, source, and enforcer identity. Settlement scope accepts only effective-user-pause and requires a direct non-delegating enforcer with the recorded runtime hash. From the first pause read through completion, the protected transaction cannot call into or originate from strategy custody and cannot enter a state-changing V2 path."
+    },
+    "orderCommitment": {
+      "type": "object",
+      "required": [
+        "custodyConfigId",
+        "routeId",
+        "orderHash",
+        "salt",
+        "maker",
+        "signer",
+        "tokenId",
+        "makerAmount",
+        "takerAmount",
+        "side",
+        "signatureType",
+        "timestamp",
+        "metadata",
+        "builder",
+        "signature",
+        "statusFilled",
+        "statusRemaining",
+        "effectiveRemainingMakerAmount",
+        "signatureValid",
+        "transferAuthorityActive",
+        "userPausedBlockAt",
+        "isUserPaused",
+        "reservedAssetType",
+        "reservedAssetContract",
+        "reservedTokenId",
+        "reservedAmount"
+      ],
+      "properties": {
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "orderHash": { "$ref": "#/$defs/bytes32" },
+        "salt": { "$ref": "#/$defs/uint256" },
+        "maker": { "$ref": "#/$defs/nonzeroAddress" },
+        "signer": { "$ref": "#/$defs/nonzeroAddress" },
+        "tokenId": { "$ref": "#/$defs/uint256" },
+        "makerAmount": { "$ref": "#/$defs/positiveUint256" },
+        "takerAmount": { "$ref": "#/$defs/uint256" },
+        "side": { "enum": ["0", "1"] },
+        "signatureType": { "enum": ["2", "3"] },
+        "timestamp": { "$ref": "#/$defs/uint256" },
+        "metadata": { "$ref": "#/$defs/bytes32" },
+        "builder": { "$ref": "#/$defs/bytes32" },
+        "signature": { "$ref": "#/$defs/nonemptyHexData" },
+        "statusFilled": { "const": false },
+        "statusRemaining": { "$ref": "#/$defs/uint248" },
+        "effectiveRemainingMakerAmount": { "$ref": "#/$defs/positiveUint256" },
+        "signatureValid": { "const": true },
+        "transferAuthorityActive": { "const": true },
+        "userPausedBlockAt": { "$ref": "#/$defs/uint256" },
+        "isUserPaused": { "const": false },
+        "reservedAssetType": { "enum": ["erc20", "erc1155"] },
+        "reservedAssetContract": { "$ref": "#/$defs/nonzeroAddress" },
+        "reservedTokenId": { "$ref": "#/$defs/nullableUint256" },
+        "reservedAmount": { "$ref": "#/$defs/positiveUint256" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "required": ["side"],
+            "properties": { "side": { "const": "0" } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["reservedAssetType", "reservedAssetContract", "reservedTokenId"],
+            "properties": {
+              "reservedAssetType": { "const": "erc20" },
+              "reservedAssetContract": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+              "reservedTokenId": { "type": "null" }
+            }
+          },
+          "else": {
+            "type": "object",
+            "required": ["reservedAssetType", "reservedAssetContract", "reservedTokenId"],
+            "properties": {
+              "reservedAssetType": { "const": "erc1155" },
+              "reservedAssetContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+              "reservedTokenId": { "$ref": "#/$defs/uint256" }
+            }
+          }
+        }
+      ],
+      "$comment": "The signed Order has no expiry or cancellation nonce. This entry records one currently active, unfilled order disclosed to the record. The PMVS verifier recomputes its EIP-712 hash, checks normalized signature and custody fields, applies the V2 zero-remaining default, derives the reserved asset and amount, and binds signatureValid and order status to exact pinned exchange reads."
+    },
+    "standardVenuePosition": {
+      "allOf": [
+        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/position-gnosis-ctf-1.schema.json" },
+        {
+          "type": "object",
+          "required": ["profile", "chainId", "positionContract", "custodyAccount", "collateralToken", "oracle", "questionId", "outcomeSlotCount", "conditionId", "parentCollectionId", "indexSet", "collectionId", "positionId", "quantity"],
+          "properties": {
+            "profile": { "const": "position/gnosis-ctf/1" },
+            "chainId": { "const": "137" },
+            "positionContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+            "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
+            "collateralToken": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+            "oracle": {
+              "enum": [
+                "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+                "0x65070be91477460d8a7aeeb94ef92fe056c2f2a7"
+              ]
+            },
+            "questionId": { "$ref": "#/$defs/bytes32" },
+            "outcomeSlotCount": { "const": "2" },
+            "conditionId": { "$ref": "#/$defs/bytes32" },
+            "parentCollectionId": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+            "indexSet": { "enum": ["1", "2"] },
+            "collectionId": { "$ref": "#/$defs/bytes32" },
+            "positionId": { "$ref": "#/$defs/uint256" },
+            "quantity": { "$ref": "#/$defs/positiveUint256" }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "$comment": "The PMVS verifier checks condition, collection, and position derivations and equality to related venue fields."
+    },
+    "negativeRiskVenuePosition": {
+      "allOf": [
+        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/position-gnosis-ctf-1.schema.json" },
+        {
+          "type": "object",
+          "required": ["profile", "chainId", "positionContract", "custodyAccount", "collateralToken", "oracle", "questionId", "outcomeSlotCount", "conditionId", "parentCollectionId", "indexSet", "collectionId", "positionId", "quantity"],
+          "properties": {
+            "profile": { "const": "position/gnosis-ctf/1" },
+            "chainId": { "const": "137" },
+            "positionContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+            "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
+            "collateralToken": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+            "oracle": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+            "questionId": { "$ref": "#/$defs/bytes32" },
+            "outcomeSlotCount": { "const": "2" },
+            "conditionId": { "$ref": "#/$defs/bytes32" },
+            "parentCollectionId": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+            "indexSet": { "enum": ["1", "2"] },
+            "collectionId": { "$ref": "#/$defs/bytes32" },
+            "positionId": { "$ref": "#/$defs/uint256" },
+            "quantity": { "$ref": "#/$defs/positiveUint256" }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "$comment": "The PMVS verifier checks condition, collection, and position derivations and equality to related venue fields."
+    },
+    "standardPositionEntry": {
+      "type": "object",
+      "required": [
+        "position",
+        "custodyConfigId",
+        "marketKind",
+        "routeId",
+        "standardOracleConfigId",
+        "negRiskConfigId",
+        "redemptionExecutionId",
+        "conditionPreparation",
+        "userPausedBlockAt",
+        "isUserPaused",
+        "reservedQuantity",
+        "venueReportedSize"
+      ],
+      "properties": {
+        "position": { "$ref": "#/$defs/standardVenuePosition" },
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "standard" },
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "standardOracleConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "negRiskConfigId": { "type": "null" },
+        "redemptionExecutionId": { "$ref": "#/$defs/nonemptyString" },
+        "conditionPreparation": {
+          "allOf": [
+            { "$ref": "#/$defs/conditionPreparation" },
+            {
+              "type": "object",
+              "required": ["oracle"],
+              "properties": {
+                "oracle": {
+                  "enum": [
+                    "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+                    "0x65070be91477460d8a7aeeb94ef92fe056c2f2a7"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "userPausedBlockAt": { "$ref": "#/$defs/uint256" },
+        "isUserPaused": { "type": "boolean" },
+        "reservedQuantity": { "$ref": "#/$defs/uint256" },
+        "venueReportedSize": { "$ref": "#/$defs/nullableUint256" }
+      },
+      "additionalProperties": false
+    },
+    "negativeRiskPositionEntry": {
+      "type": "object",
+      "required": [
+        "position",
+        "custodyConfigId",
+        "marketKind",
+        "routeId",
+        "standardOracleConfigId",
+        "negRiskConfigId",
+        "redemptionExecutionId",
+        "conditionPreparation",
+        "userPausedBlockAt",
+        "isUserPaused",
+        "reservedQuantity",
+        "venueReportedSize"
+      ],
+      "properties": {
+        "position": { "$ref": "#/$defs/negativeRiskVenuePosition" },
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "negative-risk" },
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "standardOracleConfigId": { "type": "null" },
+        "negRiskConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "redemptionExecutionId": { "$ref": "#/$defs/nonemptyString" },
+        "conditionPreparation": {
+          "allOf": [
+            { "$ref": "#/$defs/conditionPreparation" },
+            {
+              "type": "object",
+              "required": ["oracle"],
+              "properties": {
+                "oracle": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" }
+              }
+            }
+          ]
+        },
+        "userPausedBlockAt": { "$ref": "#/$defs/uint256" },
+        "isUserPaused": { "type": "boolean" },
+        "reservedQuantity": { "$ref": "#/$defs/uint256" },
+        "venueReportedSize": { "$ref": "#/$defs/nullableUint256" }
+      },
+      "additionalProperties": false
+    },
+    "depositWalletSessionSigner": {
+      "type": "object",
+      "required": [
+        "signer",
+        "validUntil",
+        "active",
+        "lastEventBlockNumber",
+        "lastEventTransactionHash",
+        "lastEventLogIndex"
+      ],
+      "properties": {
+        "signer": { "$ref": "#/$defs/nonzeroAddress" },
+        "validUntil": { "$ref": "#/$defs/uint256" },
+        "active": { "type": "boolean" },
+        "lastEventBlockNumber": { "$ref": "#/$defs/uint256" },
+        "lastEventTransactionHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "lastEventLogIndex": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false
+    },
+    "depositWalletPasskeySessionSigner": {
+      "type": "object",
+      "required": [
+        "passkeyId",
+        "x",
+        "y",
+        "validUntil",
+        "active",
+        "lastEventBlockNumber",
+        "lastEventTransactionHash",
+        "lastEventLogIndex"
+      ],
+      "properties": {
+        "passkeyId": { "$ref": "#/$defs/nonzeroBytes32" },
+        "x": { "$ref": "#/$defs/bytes32" },
+        "y": { "$ref": "#/$defs/bytes32" },
+        "validUntil": { "$ref": "#/$defs/uint256" },
+        "active": { "type": "boolean" },
+        "lastEventBlockNumber": { "$ref": "#/$defs/uint256" },
+        "lastEventTransactionHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "lastEventLogIndex": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false
+    },
+    "depositWalletCustodyConfig": {
+      "type": "object",
+      "required": [
+        "custodyConfigId",
+        "custodyAccount",
+        "walletKind",
+        "signatureType",
+        "makerAddress",
+        "orderSignerAddress",
+        "accountSignerAddress",
+        "owner",
+        "pendingOwner",
+        "pendingOwnerDeadline",
+        "pendingOwnerNonce",
+        "runtimeCodeHash",
+        "factory",
+        "factoryCodeHash",
+        "factoryImplementation",
+        "factoryImplementationCodeHash",
+        "proxyMode",
+        "implementationResolver",
+        "implementationResolverCodeHash",
+        "implementation",
+        "implementationCodeHash",
+        "controllers",
+        "threshold",
+        "modules",
+        "guard",
+        "fallbackHandler",
+        "pausedAt",
+        "implementationPinned",
+        "sessionSigners",
+        "passkeySessionSigners",
+        "nonce"
+      ],
+      "properties": {
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
+        "walletKind": { "const": "deposit-wallet-v2" },
+        "signatureType": { "const": "3" },
+        "makerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "orderSignerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "accountSignerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "owner": { "$ref": "#/$defs/nonzeroAddress" },
+        "pendingOwner": {
+          "oneOf": [
+            { "$ref": "#/$defs/nonzeroAddress" },
+            { "type": "null" }
+          ]
+        },
+        "pendingOwnerDeadline": { "$ref": "#/$defs/uint256" },
+        "pendingOwnerNonce": { "$ref": "#/$defs/uint256" },
+        "runtimeCodeHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "factory": { "const": "0x00000000000fb5c9adea0298d729a0cb3823cc07" },
+        "factoryCodeHash": { "const": "0xaaa52c8cc8a0e3fd27ce756cc6b4e70c51423e9b597b11f32d3e49f8b1fc890d" },
+        "factoryImplementation": { "const": "0x528cc05efac2b0d255e423272187efd41248abd7" },
+        "factoryImplementationCodeHash": { "const": "0xe6424f1008e46b4b657efacf9500ea7747cbbf3055d9d76459253ac2884793d2" },
+        "proxyMode": {
+          "enum": ["deposit-uups", "deposit-shared-erc1967", "deposit-implementation-pinned"]
+        },
+        "implementationResolver": {
+          "oneOf": [
+            { "const": "0x7a18edfe055488a3128f01f563e5b479d92ffc3a" },
+            { "type": "null" }
+          ]
+        },
+        "implementationResolverCodeHash": {
+          "oneOf": [
+            { "const": "0xf87b06a1302051471df08ff79a938757509569e16b7a7efa55a3ea7b29b0b9d1" },
+            { "type": "null" }
+          ]
+        },
+        "implementation": { "$ref": "#/$defs/nonzeroAddress" },
+        "implementationCodeHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "controllers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonzeroAddress" }
+        },
+        "threshold": { "const": "1" },
+        "modules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonzeroAddress" }
+        },
+        "guard": { "type": "null" },
+        "fallbackHandler": { "type": "null" },
+        "pausedAt": { "$ref": "#/$defs/uint256" },
+        "implementationPinned": { "type": "boolean" },
+        "sessionSigners": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/depositWalletSessionSigner" }
+        },
+        "passkeySessionSigners": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/depositWalletPasskeySessionSigner" }
+        },
+        "nonce": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["proxyMode", "implementationResolver", "implementationResolverCodeHash", "implementationPinned"],
+              "properties": {
+                "proxyMode": { "const": "deposit-shared-erc1967" },
+                "implementationResolver": { "const": "0x7a18edfe055488a3128f01f563e5b479d92ffc3a" },
+                "implementationResolverCodeHash": { "const": "0xf87b06a1302051471df08ff79a938757509569e16b7a7efa55a3ea7b29b0b9d1" },
+                "implementationPinned": { "const": false }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["proxyMode", "implementationResolver", "implementationResolverCodeHash", "implementationPinned"],
+              "properties": {
+                "proxyMode": { "const": "deposit-uups" },
+                "implementationResolver": { "type": "null" },
+                "implementationResolverCodeHash": { "type": "null" },
+                "implementationPinned": { "const": false }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["proxyMode", "implementationResolver", "implementationResolverCodeHash", "implementationPinned"],
+              "properties": {
+                "proxyMode": { "const": "deposit-implementation-pinned" },
+                "implementationResolver": { "type": "null" },
+                "implementationResolverCodeHash": { "type": "null" },
+                "implementationPinned": { "const": true }
+              }
+            }
+          ]
+        }
+      ],
+      "$comment": "makerAddress and orderSignerAddress equal custodyAccount. The authority set contains the active deposit-wallet-factory-upgrader proved by the pinned factory implementation. The PMVS verifier requires accountSignerAddress == owner == controllers[0], complete event-derived session candidates, timestamp-derived activity, resolver/proxyMode/pinning correspondence, and owner-path order signatures without the Deposit session-envelope magic suffix."
+    },
+    "legacySafeCustodyConfig": {
+      "type": "object",
+      "required": [
+        "custodyConfigId",
+        "custodyAccount",
+        "walletKind",
+        "signatureType",
+        "makerAddress",
+        "orderSignerAddress",
+        "accountSignerAddress",
+        "owner",
+        "pendingOwner",
+        "pendingOwnerDeadline",
+        "pendingOwnerNonce",
+        "runtimeCodeHash",
+        "factory",
+        "factoryCodeHash",
+        "factoryImplementation",
+        "factoryImplementationCodeHash",
+        "proxyMode",
+        "implementationResolver",
+        "implementationResolverCodeHash",
+        "implementation",
+        "implementationCodeHash",
+        "controllers",
+        "threshold",
+        "modules",
+        "guard",
+        "fallbackHandler",
+        "pausedAt",
+        "implementationPinned",
+        "sessionSigners",
+        "passkeySessionSigners",
+        "nonce"
+      ],
+      "properties": {
+        "custodyConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "custodyAccount": { "$ref": "#/$defs/nonzeroAddress" },
+        "walletKind": { "const": "legacy-gnosis-safe" },
+        "signatureType": { "const": "2" },
+        "makerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "orderSignerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "accountSignerAddress": { "$ref": "#/$defs/nonzeroAddress" },
+        "owner": { "type": "null" },
+        "pendingOwner": { "type": "null" },
+        "pendingOwnerDeadline": { "type": "null" },
+        "pendingOwnerNonce": { "type": "null" },
+        "runtimeCodeHash": { "const": "0x92565062fdea8761e07d9df2fcdbd66c0582af6ddf0e0355bc07754ad97400b0" },
+        "factory": { "const": "0xaacfeea03eb1561c4e67d661e40682bd20e3541b" },
+        "factoryCodeHash": { "const": "0x7a423db1d467bbd092e48044242a9c1f003442a83ca8109f0f7c07a50782e23d" },
+        "factoryImplementation": { "type": "null" },
+        "factoryImplementationCodeHash": { "type": "null" },
+        "proxyMode": { "const": "legacy-safe-proxy" },
+        "implementationResolver": { "type": "null" },
+        "implementationResolverCodeHash": { "type": "null" },
+        "implementation": { "const": "0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8" },
+        "implementationCodeHash": { "const": "0xf4b625c76701938f75938880a926414b5f91471d32e21c0cbb37566b62495ca7" },
+        "controllers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonzeroAddress" }
+        },
+        "threshold": { "$ref": "#/$defs/positiveUint256" },
+        "modules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonzeroAddress" }
+        },
+        "guard": { "$ref": "#/$defs/nullableAddress" },
+        "fallbackHandler": { "$ref": "#/$defs/nullableAddress" },
+        "pausedAt": { "type": "null" },
+        "implementationPinned": { "type": "null" },
+        "sessionSigners": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "$ref": "#/$defs/depositWalletSessionSigner" }
+        },
+        "passkeySessionSigners": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "$ref": "#/$defs/depositWalletPasskeySessionSigner" }
+        },
+        "nonce": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false,
+      "$comment": "makerAddress equals custodyAccount and orderSignerAddress equals accountSignerAddress. The PMVS verifier recomputes the CREATE2 custody address from the fixed factory, proxy bytecode hash, singleton, and derivation signer; it also enforces unique derivation signers, owner/module completeness, threshold bounds, address equality, and sorting."
+    },
+    "bid": {
+      "type": "object",
+      "required": ["priceU6", "quantity"],
+      "properties": {
+        "priceU6": { "$ref": "#/$defs/positiveU6Price" },
+        "quantity": { "$ref": "#/$defs/positiveUint256" }
+      },
+      "additionalProperties": false
+    },
+    "book": {
+      "type": "object",
+      "required": [
+        "assetId",
+        "market",
+        "negRisk",
+        "venueTimestampMs",
+        "venueHash",
+        "minOrderSizeBase",
+        "tickSizeU6",
+        "lastTradePriceU6",
+        "bids",
+        "bidsTruncated",
+        "responseHash"
+      ],
+      "properties": {
+        "assetId": { "$ref": "#/$defs/uint256" },
+        "market": { "$ref": "#/$defs/bytes32" },
+        "negRisk": { "type": "boolean" },
+        "venueTimestampMs": { "$ref": "#/$defs/uint256" },
+        "venueHash": { "$ref": "#/$defs/nonemptyString" },
+        "minOrderSizeBase": { "$ref": "#/$defs/positiveUint256" },
+        "tickSizeU6": { "$ref": "#/$defs/positiveU6Price" },
+        "lastTradePriceU6": {
+          "oneOf": [
+            { "$ref": "#/$defs/u6Price" },
+            { "type": "null" }
+          ]
+        },
+        "bids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/bid" }
+        },
+        "bidsTruncated": { "type": "boolean" },
+        "responseHash": { "$ref": "#/$defs/bytes32" }
+      },
+      "additionalProperties": false,
+      "$comment": "The PMVS verifier checks descending price order, duplicate merging, ladder completeness, and correlation with the raw response and held position."
+    },
+    "standardRouteConfig": {
+      "type": "object",
+      "required": [
+        "routeId", "marketKind", "exchange", "exchangeCodeHash", "exchangeCollateralToken", "ctf", "ctfCodeHash", "ctfCollateralToken", "outcomeTokenFactory", "outcomeTokenFactoryCodeHash", "factoryConditionalTokens", "factoryCollateralToken", "factoryUsdce", "factoryNegRiskAdapter", "factoryWrappedCollateral", "factoryPausedUsdce", "legacySafeFactory", "legacySafeFactoryCodeHash", "legacySafeImplementation", "legacySafeImplementationCodeHash", "exchangePaused", "userPauseBlockInterval", "maxFeeRateBps", "feeReceiver", "sourceCommit"
+      ],
+      "properties": {
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "standard" },
+        "exchange": { "const": "0xe111180000d2663c0091e4f400237545b87b996b" },
+        "exchangeCodeHash": { "const": "0xa08da89bbac2063dfa6a705e70314d218d40fb2b2a6405442297c241fcd58401" },
+        "exchangeCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "ctf": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "ctfCodeHash": { "const": "0xbe524e094025c2a1122ccfbe3264e29fe662d7e0ae518b6926135c814405eceb" },
+        "ctfCollateralToken": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "outcomeTokenFactory": { "const": "0xada100874d00e3331d00f2007a9c336a65009718" },
+        "outcomeTokenFactoryCodeHash": { "const": "0x1ece8945fe803fe6a0ff4f10d13979830429f51463075f3f284031d8bc17d9ed" },
+        "factoryConditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "factoryCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "factoryUsdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "factoryNegRiskAdapter": { "type": "null" },
+        "factoryWrappedCollateral": { "type": "null" },
+        "factoryPausedUsdce": { "const": false },
+        "legacySafeFactory": { "const": "0xaacfeea03eb1561c4e67d661e40682bd20e3541b" },
+        "legacySafeFactoryCodeHash": { "const": "0x7a423db1d467bbd092e48044242a9c1f003442a83ca8109f0f7c07a50782e23d" },
+        "legacySafeImplementation": { "const": "0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8" },
+        "legacySafeImplementationCodeHash": { "const": "0xf4b625c76701938f75938880a926414b5f91471d32e21c0cbb37566b62495ca7" },
+        "exchangePaused": { "type": "boolean" },
+        "userPauseBlockInterval": { "$ref": "#/$defs/uint256" },
+        "maxFeeRateBps": {
+          "$ref": "#/$defs/maxFeeRateBps",
+          "$comment": "The exact getter result. The PMVS verifier requires a positive value when an unresolved held position selects this route for a displayed-book cross mark."
+        },
+        "feeReceiver": { "$ref": "#/$defs/address" },
+        "sourceCommit": { "const": "ccc0596074f4dfd62c944fbca4de252893b82b4b" }
+      },
+      "additionalProperties": false
+    },
+    "negativeRiskRouteConfig": {
+      "type": "object",
+      "required": [
+        "routeId", "marketKind", "exchange", "exchangeCodeHash", "exchangeCollateralToken", "ctf", "ctfCodeHash", "ctfCollateralToken", "outcomeTokenFactory", "outcomeTokenFactoryCodeHash", "factoryConditionalTokens", "factoryCollateralToken", "factoryUsdce", "factoryNegRiskAdapter", "factoryWrappedCollateral", "factoryPausedUsdce", "legacySafeFactory", "legacySafeFactoryCodeHash", "legacySafeImplementation", "legacySafeImplementationCodeHash", "exchangePaused", "userPauseBlockInterval", "maxFeeRateBps", "feeReceiver", "sourceCommit"
+      ],
+      "properties": {
+        "routeId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "negative-risk" },
+        "exchange": { "const": "0xe2222d279d744050d28e00520010520000310f59" },
+        "exchangeCodeHash": { "const": "0x04b857d48dcc38b3d484239569dc96a7a6c39bbb90ed2461227fc6e50ed5787d" },
+        "exchangeCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "ctf": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "ctfCodeHash": { "const": "0xbe524e094025c2a1122ccfbe3264e29fe662d7e0ae518b6926135c814405eceb" },
+        "ctfCollateralToken": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "outcomeTokenFactory": { "const": "0xada200001000ef00d07553cee7006808f895c6f1" },
+        "outcomeTokenFactoryCodeHash": { "const": "0x0cec3398b0b528b191ccb9b0e7d023731c8f582f401d526f48ca7575df7a003e" },
+        "factoryConditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "factoryCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "factoryUsdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "factoryNegRiskAdapter": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "factoryWrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "factoryPausedUsdce": { "const": false },
+        "legacySafeFactory": { "const": "0xaacfeea03eb1561c4e67d661e40682bd20e3541b" },
+        "legacySafeFactoryCodeHash": { "const": "0x7a423db1d467bbd092e48044242a9c1f003442a83ca8109f0f7c07a50782e23d" },
+        "legacySafeImplementation": { "const": "0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8" },
+        "legacySafeImplementationCodeHash": { "const": "0xf4b625c76701938f75938880a926414b5f91471d32e21c0cbb37566b62495ca7" },
+        "exchangePaused": { "type": "boolean" },
+        "userPauseBlockInterval": { "$ref": "#/$defs/uint256" },
+        "maxFeeRateBps": {
+          "$ref": "#/$defs/maxFeeRateBps",
+          "$comment": "The exact getter result. The PMVS verifier requires a positive value when an unresolved held position selects this route for a displayed-book cross mark."
+        },
+        "feeReceiver": { "$ref": "#/$defs/address" },
+        "sourceCommit": { "const": "ccc0596074f4dfd62c944fbca4de252893b82b4b" }
+      },
+      "additionalProperties": false
+    },
+    "standardOracleV31Config": {
+      "type": "object",
+      "required": ["standardOracleConfigId", "oracle", "version", "runtimeCodeHash", "ctf", "optimisticOracle", "collateralWhitelist", "questionId", "initialized", "flagged", "ready", "questionStateReturnData", "sourceCommit"],
+      "properties": {
+        "standardOracleConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "oracle": { "const": "0x157ce2d672854c848c9b79c49a8cc6cc89176a49" },
+        "version": { "const": "v3.1.0" },
+        "runtimeCodeHash": { "const": "0xe44d7e53a84493f6b71255e19f42f7cea9b8be486492fee80529c75d75f61579" },
+        "ctf": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "optimisticOracle": { "const": "0xee3afe347d5c74317041e2618c49534daf887c24" },
+        "collateralWhitelist": { "const": "0x1020ae36548ab28bc0c41fd2a08d24132c82cc55" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "initialized": { "const": true },
+        "flagged": { "type": "boolean" },
+        "ready": { "type": "boolean" },
+        "questionStateReturnData": { "$ref": "#/$defs/hexData" },
+        "sourceCommit": { "const": "10dd8829d710ed9c2541b4196b463ad0c90546fc" }
+      },
+      "additionalProperties": false
+    },
+    "standardOracleV4Config": {
+      "type": "object",
+      "required": ["standardOracleConfigId", "oracle", "version", "runtimeCodeHash", "ctf", "optimisticOracle", "collateralWhitelist", "questionId", "initialized", "flagged", "ready", "questionStateReturnData", "sourceCommit"],
+      "properties": {
+        "standardOracleConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "oracle": { "const": "0x65070be91477460d8a7aeeb94ef92fe056c2f2a7" },
+        "version": { "const": "v4" },
+        "runtimeCodeHash": { "const": "0x52a5f0260d4fe3072f2636c084f0c7c80736912480db15cc3d1fbe251dc47d02" },
+        "ctf": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "optimisticOracle": { "const": "0x2c0367a9db231ddebd88a94b4f6461a6e47c58b1" },
+        "collateralWhitelist": { "const": "0x1020ae36548ab28bc0c41fd2a08d24132c82cc55" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "initialized": { "const": true },
+        "flagged": { "type": "boolean" },
+        "ready": { "type": "boolean" },
+        "questionStateReturnData": { "$ref": "#/$defs/hexData" },
+        "sourceCommit": { "const": "8b76cc9e0d46c6f7450a0adb0ddc0f5b0568c9cc" }
+      },
+      "additionalProperties": false
+    },
+    "negativeRiskConfig": {
+      "type": "object",
+      "required": [
+        "negRiskConfigId", "marketId", "questionId", "questionIndex", "questionCount", "feeBps", "determined", "resultIndex", "negRiskAdapter", "negRiskAdapterCodeHash", "wrappedCollateral", "marketOperator", "marketOperatorCodeHash", "operatorNegRiskAdapter", "upstreamOracle", "upstreamOracleCodeHash", "upstreamCtf", "upstreamOptimisticOracle", "upstreamCollateralWhitelist", "upstreamInitialized", "upstreamFlagged", "upstreamReady", "upstreamQuestionStateReturnData", "operatorDelaySeconds", "requestId", "flaggedAt", "reportedAt", "reportedResult", "adapterMarketPrepared", "adapterQuestionPrepared", "operatorMarketPrepared", "operatorQuestionPrepared", "operatorSourceCommit", "upstreamSourceCommit"
+      ],
+      "properties": {
+        "negRiskConfigId": { "$ref": "#/$defs/nonemptyString" },
+        "marketId": { "$ref": "#/$defs/bytes32" },
+        "questionId": { "$ref": "#/$defs/bytes32" },
+        "questionIndex": { "$ref": "#/$defs/uint8" },
+        "questionCount": { "$ref": "#/$defs/questionCount" },
+        "feeBps": { "$ref": "#/$defs/basisPoints" },
+        "determined": { "type": "boolean" },
+        "resultIndex": {
+          "oneOf": [
+            { "$ref": "#/$defs/uint8" },
+            { "type": "null" }
+          ]
+        },
+        "negRiskAdapter": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "negRiskAdapterCodeHash": { "const": "0x10798bfdebdc3b8727171551b1287ee4c87b486045ed51a6ddc94e34f66560a1" },
+        "wrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "marketOperator": {
+          "enum": [
+            "0x71523d0f655b41e805cec45b17163f528b59b820",
+            "0x661992aebf6becf7ba5abb66f6b0bf62aa7a2e93"
+          ]
+        },
+        "marketOperatorCodeHash": {
+          "enum": [
+            "0xe3984626542d7a0a5ac4ef76b5cd0819a7164f3695bc41650a55579c6953d60f",
+            "0xcdf35da3f66423b7fa071ca745396c19d961e295ecae60516be55035b890797a"
+          ]
+        },
+        "operatorNegRiskAdapter": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "upstreamOracle": {
+          "enum": [
+            "0x2f5e3684cb1f318ec51b00edba38d79ac2c0aa9d",
+            "0x69c47de9d4d3dad79590d61b9e05918e03775f24"
+          ]
+        },
+        "upstreamOracleCodeHash": { "$ref": "#/$defs/nonzeroBytes32" },
+        "upstreamCtf": { "$ref": "#/$defs/nonzeroAddress" },
+        "upstreamOptimisticOracle": { "$ref": "#/$defs/nonzeroAddress" },
+        "upstreamCollateralWhitelist": { "const": "0x1020ae36548ab28bc0c41fd2a08d24132c82cc55" },
+        "upstreamInitialized": { "const": true },
+        "upstreamFlagged": { "type": "boolean" },
+        "upstreamReady": { "type": "boolean" },
+        "upstreamQuestionStateReturnData": { "$ref": "#/$defs/hexData" },
+        "operatorDelaySeconds": { "enum": ["0", "3600"] },
+        "requestId": { "$ref": "#/$defs/bytes32" },
+        "flaggedAt": { "$ref": "#/$defs/uint256" },
+        "reportedAt": { "$ref": "#/$defs/uint256" },
+        "reportedResult": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        },
+        "adapterMarketPrepared": { "$ref": "#/$defs/adapterMarketPreparedEvent" },
+        "adapterQuestionPrepared": { "$ref": "#/$defs/adapterQuestionPreparedEvent" },
+        "operatorMarketPrepared": { "$ref": "#/$defs/operatorMarketPreparedEvent" },
+        "operatorQuestionPrepared": { "$ref": "#/$defs/operatorQuestionPreparedEvent" },
+        "operatorSourceCommit": {
+          "enum": [
+            "e206dd2ed5aa24cf1f86990b875c6b1577be25e2",
+            "f78b35b0863b4308a431ca307d06f49b2ea65e78"
+          ]
+        },
+        "upstreamSourceCommit": { "$ref": "#/$defs/gitCommit" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["marketOperator", "marketOperatorCodeHash", "upstreamOracle", "upstreamOracleCodeHash", "upstreamCtf", "upstreamOptimisticOracle", "operatorDelaySeconds", "operatorSourceCommit", "upstreamSourceCommit"],
+              "properties": {
+                "marketOperator": { "const": "0x71523d0f655b41e805cec45b17163f528b59b820" },
+                "marketOperatorCodeHash": { "const": "0xe3984626542d7a0a5ac4ef76b5cd0819a7164f3695bc41650a55579c6953d60f" },
+                "upstreamOracle": { "const": "0x2f5e3684cb1f318ec51b00edba38d79ac2c0aa9d" },
+                "upstreamOracleCodeHash": { "const": "0x9fc07708d13b3aca75a3a74f0f98a6f338b6e3c2384447edf096209f3a01fc1d" },
+                "upstreamCtf": { "const": "0x71523d0f655b41e805cec45b17163f528b59b820" },
+                "upstreamOptimisticOracle": { "const": "0xee3afe347d5c74317041e2618c49534daf887c24" },
+                "operatorDelaySeconds": { "const": "3600" },
+                "operatorSourceCommit": { "const": "e206dd2ed5aa24cf1f86990b875c6b1577be25e2" },
+                "upstreamSourceCommit": { "const": "10dd8829d710ed9c2541b4196b463ad0c90546fc" }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["marketOperator", "marketOperatorCodeHash", "upstreamOracle", "upstreamOracleCodeHash", "upstreamCtf", "upstreamOptimisticOracle", "operatorDelaySeconds", "operatorSourceCommit", "upstreamSourceCommit"],
+              "properties": {
+                "marketOperator": { "const": "0x661992aebf6becf7ba5abb66f6b0bf62aa7a2e93" },
+                "marketOperatorCodeHash": { "const": "0xcdf35da3f66423b7fa071ca745396c19d961e295ecae60516be55035b890797a" },
+                "upstreamOracle": { "const": "0x69c47de9d4d3dad79590d61b9e05918e03775f24" },
+                "upstreamOracleCodeHash": { "const": "0x76a83a5e6b6e30a6fefe5ca6af94dcfed92cea8e8ea739abbc8d4a663c876be1" },
+                "upstreamCtf": { "const": "0x661992aebf6becf7ba5abb66f6b0bf62aa7a2e93" },
+                "upstreamOptimisticOracle": { "const": "0x2c0367a9db231ddebd88a94b4f6461a6e47c58b1" },
+                "operatorDelaySeconds": { "const": "0" },
+                "operatorSourceCommit": { "const": "f78b35b0863b4308a431ca307d06f49b2ea65e78" },
+                "upstreamSourceCommit": { "const": "8b76cc9e0d46c6f7450a0adb0ddc0f5b0568c9cc" }
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "type": "object",
+            "required": ["determined"],
+            "properties": { "determined": { "const": true } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["resultIndex"],
+            "properties": { "resultIndex": { "$ref": "#/$defs/uint8" } }
+          },
+          "else": {
+            "type": "object",
+            "required": ["resultIndex"],
+            "properties": { "resultIndex": { "type": "null" } }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "required": ["reportedAt"],
+            "properties": { "reportedAt": { "const": "0" } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["reportedResult"],
+            "properties": { "reportedResult": { "type": "null" } }
+          },
+          "else": {
+            "type": "object",
+            "required": ["reportedResult"],
+            "properties": { "reportedResult": { "type": "boolean" } }
+          }
+        }
+      ],
+      "$comment": "The PMVS verifier checks question derivations, result nullability, event equality, and the selected upstream adapter's source and state correspondence."
+    },
+    "sweepBalance": {
+      "type": "object",
+      "required": ["account", "tokenContract", "tokenId", "amount"],
+      "properties": {
+        "account": { "$ref": "#/$defs/nonzeroAddress" },
+        "tokenContract": { "$ref": "#/$defs/nonzeroAddress" },
+        "tokenId": { "$ref": "#/$defs/nullableUint256" },
+        "amount": { "const": "0" }
+      },
+      "additionalProperties": false
+    },
+    "standardDirectRedemption": {
+      "type": "object",
+      "required": ["redemptionRouteId", "marketKind", "kind", "adapterRole", "entrypoint", "entrypointCodeHash", "rawCtfCollateralToken", "intermediateOutputTokens", "accountingOutputToken", "balanceSelection", "conditionalTokens", "collateralToken", "usdce", "negRiskAdapter", "wrappedCollateral", "onramp", "onrampCodeHash", "sweepBalances", "pausedUsdce", "sourceCommits"],
+      "properties": {
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "standard" },
+        "kind": { "const": "direct-ctf-onramp" },
+        "adapterRole": { "const": "none" },
+        "entrypoint": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "entrypointCodeHash": { "const": "0xbe524e094025c2a1122ccfbe3264e29fe662d7e0ae518b6926135c814405eceb" },
+        "rawCtfCollateralToken": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "intermediateOutputTokens": { "const": ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"] },
+        "accountingOutputToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "balanceSelection": { "const": "caller-full-listed-ids" },
+        "conditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "collateralToken": { "type": "null" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "negRiskAdapter": { "type": "null" },
+        "wrappedCollateral": { "type": "null" },
+        "onramp": { "const": "0x93070a847efef7f70739046a929d47a521f5b8ee" },
+        "onrampCodeHash": { "const": "0x89eaba6b38dda7ebd07176f42f9e9f70dbadd46b7cbf826d15341729b19bb389" },
+        "sweepBalances": { "type": "array", "maxItems": 0 },
+        "pausedUsdce": { "const": false },
+        "sourceCommits": {
+          "const": [
+            "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+            "eeefca66eb46c800a9aaab88db2064a99026fde5"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "standardAdapterRedemption": {
+      "type": "object",
+      "required": ["redemptionRouteId", "marketKind", "kind", "adapterRole", "entrypoint", "entrypointCodeHash", "rawCtfCollateralToken", "intermediateOutputTokens", "accountingOutputToken", "balanceSelection", "conditionalTokens", "collateralToken", "usdce", "negRiskAdapter", "wrappedCollateral", "onramp", "onrampCodeHash", "sweepBalances", "pausedUsdce", "sourceCommits"],
+      "properties": {
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "standard" },
+        "kind": { "const": "ctf-exchange-bound-factory" },
+        "adapterRole": { "const": "exchange-bound-factory" },
+        "entrypoint": { "const": "0xada100874d00e3331d00f2007a9c336a65009718" },
+        "entrypointCodeHash": { "const": "0x1ece8945fe803fe6a0ff4f10d13979830429f51463075f3f284031d8bc17d9ed" },
+        "rawCtfCollateralToken": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "intermediateOutputTokens": { "const": ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"] },
+        "accountingOutputToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "balanceSelection": { "const": "caller-full-binary-set" },
+        "conditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "collateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "negRiskAdapter": { "type": "null" },
+        "wrappedCollateral": { "type": "null" },
+        "onramp": { "type": "null" },
+        "onrampCodeHash": { "type": "null" },
+        "sweepBalances": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sweepBalance" },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xada100874d00e3331d00f2007a9c336a65009718" },
+                  "tokenContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+                  "tokenId": { "$ref": "#/$defs/uint256" }
+                }
+              },
+              "minContains": 2,
+              "maxContains": 2
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xada100874d00e3331d00f2007a9c336a65009718" },
+                  "tokenContract": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+                  "tokenId": { "type": "null" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "pausedUsdce": { "const": false },
+        "sourceCommits": {
+          "const": [
+            "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+            "eeefca66eb46c800a9aaab88db2064a99026fde5"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "negativeDirectRedemption": {
+      "type": "object",
+      "required": ["redemptionRouteId", "marketKind", "kind", "adapterRole", "entrypoint", "entrypointCodeHash", "rawCtfCollateralToken", "intermediateOutputTokens", "accountingOutputToken", "balanceSelection", "conditionalTokens", "collateralToken", "usdce", "negRiskAdapter", "wrappedCollateral", "onramp", "onrampCodeHash", "sweepBalances", "pausedUsdce", "sourceCommits"],
+      "properties": {
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "negative-risk" },
+        "kind": { "const": "neg-risk-direct-ctf-onramp" },
+        "adapterRole": { "const": "none" },
+        "entrypoint": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "entrypointCodeHash": { "const": "0xbe524e094025c2a1122ccfbe3264e29fe662d7e0ae518b6926135c814405eceb" },
+        "rawCtfCollateralToken": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "intermediateOutputTokens": { "const": ["0x3a3bd7bb9528e159577f7c2e685cc81a765002e2", "0x2791bca1f2de4661ed88a30c99a7a9449aa84174"] },
+        "accountingOutputToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "balanceSelection": { "const": "caller-full-listed-ids" },
+        "conditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "collateralToken": { "type": "null" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "negRiskAdapter": { "type": "null" },
+        "wrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "onramp": { "const": "0x93070a847efef7f70739046a929d47a521f5b8ee" },
+        "onrampCodeHash": { "const": "0x89eaba6b38dda7ebd07176f42f9e9f70dbadd46b7cbf826d15341729b19bb389" },
+        "sweepBalances": { "type": "array", "maxItems": 0 },
+        "pausedUsdce": { "const": false },
+        "sourceCommits": {
+          "const": [
+            "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+            "eeefca66eb46c800a9aaab88db2064a99026fde5",
+            "f78b35b0863b4308a431ca307d06f49b2ea65e78"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "negativeLegacyAdapterRedemption": {
+      "type": "object",
+      "required": ["redemptionRouteId", "marketKind", "kind", "adapterRole", "entrypoint", "entrypointCodeHash", "rawCtfCollateralToken", "intermediateOutputTokens", "accountingOutputToken", "balanceSelection", "conditionalTokens", "collateralToken", "usdce", "negRiskAdapter", "wrappedCollateral", "onramp", "onrampCodeHash", "sweepBalances", "pausedUsdce", "sourceCommits"],
+      "properties": {
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "negative-risk" },
+        "kind": { "const": "neg-risk-adapter-onramp" },
+        "adapterRole": { "const": "legacy-neg-risk-adapter" },
+        "entrypoint": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "entrypointCodeHash": { "const": "0x10798bfdebdc3b8727171551b1287ee4c87b486045ed51a6ddc94e34f66560a1" },
+        "rawCtfCollateralToken": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "intermediateOutputTokens": { "const": ["0x3a3bd7bb9528e159577f7c2e685cc81a765002e2", "0x2791bca1f2de4661ed88a30c99a7a9449aa84174"] },
+        "accountingOutputToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "balanceSelection": { "const": "explicit-binary-amounts" },
+        "conditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "collateralToken": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "negRiskAdapter": { "type": "null" },
+        "wrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "onramp": { "const": "0x93070a847efef7f70739046a929d47a521f5b8ee" },
+        "onrampCodeHash": { "const": "0x89eaba6b38dda7ebd07176f42f9e9f70dbadd46b7cbf826d15341729b19bb389" },
+        "sweepBalances": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sweepBalance" },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+                  "tokenContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+                  "tokenId": { "$ref": "#/$defs/uint256" }
+                }
+              },
+              "minContains": 2,
+              "maxContains": 2
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+                  "tokenContract": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+                  "tokenId": { "type": "null" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "pausedUsdce": { "const": false },
+        "sourceCommits": {
+          "const": [
+            "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+            "eeefca66eb46c800a9aaab88db2064a99026fde5",
+            "f78b35b0863b4308a431ca307d06f49b2ea65e78"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "negativeCollateralAdapterRedemption": {
+      "type": "object",
+      "required": ["redemptionRouteId", "marketKind", "kind", "adapterRole", "entrypoint", "entrypointCodeHash", "rawCtfCollateralToken", "intermediateOutputTokens", "accountingOutputToken", "balanceSelection", "conditionalTokens", "collateralToken", "usdce", "negRiskAdapter", "wrappedCollateral", "onramp", "onrampCodeHash", "sweepBalances", "pausedUsdce", "sourceCommits"],
+      "properties": {
+        "redemptionRouteId": { "$ref": "#/$defs/nonemptyString" },
+        "marketKind": { "const": "negative-risk" },
+        "kind": { "const": "neg-risk-exchange-bound-factory" },
+        "adapterRole": { "const": "exchange-bound-factory" },
+        "entrypoint": { "const": "0xada200001000ef00d07553cee7006808f895c6f1" },
+        "entrypointCodeHash": { "const": "0x0cec3398b0b528b191ccb9b0e7d023731c8f582f401d526f48ca7575df7a003e" },
+        "rawCtfCollateralToken": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "intermediateOutputTokens": { "const": ["0x3a3bd7bb9528e159577f7c2e685cc81a765002e2", "0x2791bca1f2de4661ed88a30c99a7a9449aa84174"] },
+        "accountingOutputToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "balanceSelection": { "const": "caller-full-binary-set" },
+        "conditionalTokens": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+        "collateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "negRiskAdapter": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "wrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "onramp": { "type": "null" },
+        "onrampCodeHash": { "type": "null" },
+        "sweepBalances": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sweepBalance" },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xada200001000ef00d07553cee7006808f895c6f1" },
+                  "tokenContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+                  "tokenId": { "$ref": "#/$defs/uint256" }
+                }
+              },
+              "minContains": 2,
+              "maxContains": 2
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+                  "tokenContract": { "const": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" },
+                  "tokenId": { "$ref": "#/$defs/uint256" }
+                }
+              },
+              "minContains": 2,
+              "maxContains": 2
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+                  "tokenContract": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+                  "tokenId": { "type": "null" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["account", "tokenContract", "tokenId"],
+                "properties": {
+                  "account": { "const": "0xada200001000ef00d07553cee7006808f895c6f1" },
+                  "tokenContract": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+                  "tokenId": { "type": "null" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "pausedUsdce": { "const": false },
+        "sourceCommits": {
+          "const": [
+            "ccc0596074f4dfd62c944fbca4de252893b82b4b",
+            "eeefca66eb46c800a9aaab88db2064a99026fde5",
+            "f78b35b0863b4308a431ca307d06f49b2ea65e78"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "The six sweep entries cover the outer adapter's CTF YES/NO, d91's CTF YES/NO and WCOL, and the outer adapter's USDC.e. The PMVS verifier checks account/token/tokenId set completeness."
+    },
+    "collateralConfig": {
+      "type": "object",
+      "required": ["accountingToken", "proxyCodeHash", "implementation", "implementationCodeHash", "decimals", "nativeUsdc", "usdce", "vault", "totalSupply", "maxUsdceSettlementExposure", "vaultUsdceBalance", "vaultUsdceAllowance", "onramp", "onrampCodeHash", "onrampCollateralToken", "onrampPausedUsdce", "offramp", "offrampCodeHash", "offrampCollateralToken", "offrampPausedUsdce"],
+      "properties": {
+        "accountingToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "proxyCodeHash": { "const": "0xaaa52c8cc8a0e3fd27ce756cc6b4e70c51423e9b597b11f32d3e49f8b1fc890d" },
+        "implementation": { "const": "0x6bbcef9f7ef3b6c592c99e0f206a0de94ad0925f" },
+        "implementationCodeHash": { "const": "0x932c9369433b333d6d97d99b7731885751862aa3502122786d24174a9fd8e58e" },
+        "decimals": { "const": "6" },
+        "nativeUsdc": { "const": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359" },
+        "usdce": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "vault": { "$ref": "#/$defs/nonzeroAddress" },
+        "totalSupply": { "$ref": "#/$defs/uint256" },
+        "maxUsdceSettlementExposure": { "$ref": "#/$defs/uint256" },
+        "vaultUsdceBalance": { "$ref": "#/$defs/uint256" },
+        "vaultUsdceAllowance": { "$ref": "#/$defs/uint256" },
+        "onramp": { "const": "0x93070a847efef7f70739046a929d47a521f5b8ee" },
+        "onrampCodeHash": { "const": "0x89eaba6b38dda7ebd07176f42f9e9f70dbadd46b7cbf826d15341729b19bb389" },
+        "onrampCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "onrampPausedUsdce": { "const": false },
+        "offramp": { "const": "0x2957922eb93258b93368531d39facca3b4dc5854" },
+        "offrampCodeHash": { "const": "0x18de842db0ec4b253afe413446ac5c6c26e878289f5c7a425a9464dbad72d45d" },
+        "offrampCollateralToken": { "const": "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb" },
+        "offrampPausedUsdce": { "const": false }
+      },
+      "additionalProperties": false,
+      "$comment": "The PMVS verifier recomputes maxUsdceSettlementExposure and requires vaultUsdceBalance and vaultUsdceAllowance to cover it."
+    },
+    "wrappedCollateralConfig": {
+      "type": "object",
+      "required": ["wrappedCollateral", "runtimeCodeHash", "owner", "underlying", "decimals", "totalSupply", "maxRedemptionExposure", "underlyingBalance"],
+      "properties": {
+        "wrappedCollateral": { "const": "0x3a3bd7bb9528e159577f7c2e685cc81a765002e2" },
+        "runtimeCodeHash": { "const": "0x99c62168488983e6ac023c62a6dca53acc7e8e902849fb72a9b08f29545dc474" },
+        "owner": { "const": "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296" },
+        "underlying": { "const": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" },
+        "decimals": { "const": "6" },
+        "totalSupply": { "$ref": "#/$defs/uint256" },
+        "maxRedemptionExposure": { "$ref": "#/$defs/uint256" },
+        "underlyingBalance": { "$ref": "#/$defs/uint256" }
+      },
+      "additionalProperties": false,
+      "$comment": "The PMVS verifier recomputes maxRedemptionExposure and requires underlyingBalance to cover it."
+    },
+    "erc1155Approval": {
+      "type": "object",
+      "required": ["tokenContract", "owner", "operator", "approved", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+      "properties": {
+        "tokenContract": { "$ref": "#/$defs/nonzeroAddress" },
+        "owner": { "$ref": "#/$defs/nonzeroAddress" },
+        "operator": { "$ref": "#/$defs/nonzeroAddress" },
+        "approved": { "type": "boolean" },
+        "lastEventBlockNumber": { "$ref": "#/$defs/nullableUint256" },
+        "lastEventTransactionHash": { "$ref": "#/$defs/nullableBytes32" },
+        "lastEventLogIndex": { "$ref": "#/$defs/nullableUint256" }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "lastEventBlockNumber": { "type": "null" },
+            "lastEventTransactionHash": { "type": "null" },
+            "lastEventLogIndex": { "type": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "lastEventBlockNumber": { "$ref": "#/$defs/uint256" },
+            "lastEventTransactionHash": { "$ref": "#/$defs/bytes32" },
+            "lastEventLogIndex": { "$ref": "#/$defs/uint256" }
+          }
+        }
+      ]
+    },
+    "erc20Allowance": {
+      "type": "object",
+      "required": ["token", "owner", "spender", "amount", "candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+      "properties": {
+        "token": { "$ref": "#/$defs/nonzeroAddress" },
+        "owner": { "$ref": "#/$defs/nonzeroAddress" },
+        "spender": { "$ref": "#/$defs/nonzeroAddress" },
+        "amount": { "$ref": "#/$defs/uint256" },
+        "candidateSource": { "enum": ["event", "route"] },
+        "lastEventBlockNumber": { "$ref": "#/$defs/nullableUint256" },
+        "lastEventTransactionHash": { "$ref": "#/$defs/nullableBytes32" },
+        "lastEventLogIndex": { "$ref": "#/$defs/nullableUint256" }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "candidateSource": { "const": "event" },
+            "lastEventBlockNumber": { "$ref": "#/$defs/uint256" },
+            "lastEventTransactionHash": { "$ref": "#/$defs/bytes32" },
+            "lastEventLogIndex": { "$ref": "#/$defs/uint256" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "candidateSource": { "const": "route" },
+            "lastEventBlockNumber": { "type": "null" },
+            "lastEventTransactionHash": { "type": "null" },
+            "lastEventLogIndex": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "required": ["contract", "account", "role", "active", "candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/nonzeroAddress" },
+        "account": { "$ref": "#/$defs/nonzeroAddress" },
+        "role": { "$ref": "#/$defs/nonemptyString" },
+        "active": { "type": "boolean" },
+        "candidateSource": { "enum": ["constructor", "event", "route"] },
+        "lastEventBlockNumber": { "$ref": "#/$defs/nullableUint256" },
+        "lastEventTransactionHash": { "$ref": "#/$defs/nullableBytes32" },
+        "lastEventLogIndex": { "$ref": "#/$defs/nullableUint256" }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "candidateSource": { "const": "event" },
+            "lastEventBlockNumber": { "$ref": "#/$defs/uint256" },
+            "lastEventTransactionHash": { "$ref": "#/$defs/bytes32" },
+            "lastEventLogIndex": { "$ref": "#/$defs/uint256" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["candidateSource", "lastEventBlockNumber", "lastEventTransactionHash", "lastEventLogIndex"],
+          "properties": {
+            "candidateSource": { "enum": ["constructor", "route"] },
+            "lastEventBlockNumber": { "type": "null" },
+            "lastEventTransactionHash": { "type": "null" },
+            "lastEventLogIndex": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "response": {
+      "type": "object",
+      "required": ["responseHash", "sourceProfile", "requestMethod", "requestUrl", "httpStatus", "startedAtMs", "endedAtMs", "mediaType", "bodyLength", "retrievalUris"],
+      "properties": {
+        "responseHash": { "$ref": "#/$defs/bytes32" },
+        "sourceProfile": { "const": "venue/polymarket/1" },
+        "requestMethod": { "const": "GET" },
+        "requestUrl": { "$ref": "#/$defs/nonemptyString" },
+        "httpStatus": { "type": "string", "pattern": "^[1-5][0-9]{2}$" },
+        "startedAtMs": { "$ref": "#/$defs/uint256" },
+        "endedAtMs": { "$ref": "#/$defs/uint256" },
+        "mediaType": { "$ref": "#/$defs/nonemptyString" },
+        "bodyLength": { "$ref": "#/$defs/uint256" },
+        "retrievalUris": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonemptyString" }
+        }
+      },
+      "additionalProperties": false,
+      "$comment": "Credentials and authorization headers are not fields and are rejected by the closed object. The PMVS verifier checks time ordering, content hashes, and byte-identical retrieval."
+    }
+  }
+}
