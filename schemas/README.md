@@ -8,7 +8,7 @@ Schema validation checks shape, not truth — and passing a validator is **not**
 
 | File | Purpose |
 |---|---|
-| [`pmvs-envelope-v1.schema.json`](./pmvs-envelope-v1.schema.json) | Envelope and nine record kinds; kind 6 is reserved |
+| [`pmvs-envelope-v1.schema.json`](./pmvs-envelope-v1.schema.json) | Envelope and nine record kinds; numbers 6 and 9 are reserved |
 | [`position-gnosis-ctf-1.schema.json`](./position-gnosis-ctf-1.schema.json) | `position/gnosis-ctf/1` positions |
 | [`venue-polymarket-1.schema.json`](./venue-polymarket-1.schema.json) | `venue/polymarket/1` venue state |
 
