@@ -43,4 +43,6 @@ ERC-7540 also requires its request, claim, operator, preview, and event behavior
 
 PMVS is a pre-EIP suite under [EIP-1](https://eips.ethereum.org/EIPS/eip-1). ERC-8113 series accounting conflicts with Core v1's single NAV basis and needs a new Core version.
 
+**Reserved:** `PMVS-CHALLENGE` names future work on challenges, bonds, and recourse — mechanisms that act before settlement instead of only proving wrongdoing after it. Nothing in v1 implements it.
+
 Requirement words follow [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174). Selectors and encodings adopt the [Solidity ABI specification](https://docs.soliditylang.org/en/latest/abi-spec.html).
