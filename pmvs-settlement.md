@@ -50,6 +50,8 @@ A deposit locks accounting assets in the vault. A withdrawal locks vault shares.
 
 The owner MAY cancel while the request is pending and recover the exact input. A delegate may submit a request or claim, but delegation does not transfer ownership.
 
+"Deadline remedy" appears throughout this Part: in `bounded` request-liveness mode, a pending request that passes its deadline can be refunded or delivered by anyone, not just the operator. See [When normal settlement stops](#when-normal-settlement-stops).
+
 ### 2. Price
 
 [M1](./pmvs-m1.md) defines how the backend freezes one portfolio snapshot, reconstructs custody, calculates NAV, and produces the price evidence. The backend proposes an ordered batch. The valuation authority publishes:

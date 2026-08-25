@@ -119,6 +119,9 @@ Plain words for the terms this standard uses most:
 | Record / anchor | A signed JSON document describing what happened; anchoring stores its hash onchain in order. |
 | Leaf / Merkle claim | A user's stored payout in a settled batch, provable with a short proof path. |
 | Profile | A versioned rule set (venue, anchor, storage) selected by name in the components record. |
+| Valuation / settlement authority | The two roles allowed to publish prices and submit settlement batches — separate powers, named in the components record. |
+| Backend boundary | The fixed seam between the offchain backend and the onchain vault: one price-publication call. |
+| High-water mark | The highest per-share price already fee'd; performance fee applies only above it. |
 | Watcher | An independent observer who publishes their own records about a vault. |
 | Recovery right | A recorded claim on vault value outside normal requests — e.g. funds sent to a wrong address. |
 

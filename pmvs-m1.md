@@ -53,7 +53,7 @@ The backend pins each chain to one block and each venue response to its raw byte
 A resolved position uses its onchain payout. A live position uses the captured bids, from best to worst, less the declared exit cost. The venue profile defines the exact price scale, fees, collateral conversion, and limits on unsold exposure.
 
 ```text
-gross assets = cash + other declared assets + position values
+gross assets = cash + position values
 NAV          = max(gross assets - liabilities, 0)
 
 PPS = floor(NAV * 10^shareDecimals * 10^18

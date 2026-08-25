@@ -35,7 +35,7 @@
     "decimalsMax18": {
       "type": "string",
       "pattern": "^(?:0|[1-9]|1[0-8])$",
-      "$comment": "decimals capped at 18; the annex fee math requires asset decimals D <= 18"
+      "$comment": "decimals capped at 18; the annex fee math requires accounting-asset decimals D <= 18, and backend/settlement/1 pins 18-decimal shares"
     },
     "uint64": {
       "type": "string",

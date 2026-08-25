@@ -19,7 +19,7 @@ Most readers do not need this file. Read [Core](./pmvs-core.md), [Settlement](./
 
 This annex defines the exact EVM wire format and settlement mechanics. Implementations and verifiers MUST use the types, field order, hashes, calls, and events below. The [schemas](./schemas/README.md) define record shapes.
 
-**Compatibility note.** This is the v1 target wire format. The first Zeit reference deployment predates it: its settlement inputs carry a `dataURI` string this annex drops, its Merkle leaves are undomained 92-byte packed fields, and its zero-NAV roll permanently retires instead of winddown-and-restart. Those deployments conform to an earlier iteration, not this annex; a migration path is future work (see [standards map](./standards-map.md)).
+**Compatibility note.** This is the v1 target wire format. The first Zeit reference deployment predates it: its settlement inputs carry a `dataURI` string this annex drops, its Merkle leaves are undomained 92-byte packed fields, and its zero-NAV roll permanently retires instead of winddown-and-restart. Those deployments conform to an earlier iteration, not this annex; a migration path is future work.
 
 ## Common encoding
 
@@ -47,7 +47,7 @@ EOA signatures MUST satisfy [EIP-2](https://eips.ethereum.org/EIPS/eip-2) low-`s
 
 ### Record kinds
 
-Every record kind has one permanent number. The number is the `kind` in attestations, authority lookups, heads, and anchor events; the schema uses the matching string name.
+Every record kind has one permanent number. The number is the `kind` in attestations, authority lookups, heads, and anchor events. The envelope schema names kinds by string, except watcher heads inside migrations, which carry the number directly.
 
 | Number | Record kind | String name |
 |---|---|---|
@@ -238,6 +238,8 @@ The event stores `signatureHash = keccak256(signature)`. Watcher streams use:
 streamId = keccak256(abi.encodePacked("PMVS:WATCHER:1", signer))
 ```
 
+A finalized subject accepts commits only for records whose kind is `correction` (`1`).
+
 Anchor migration uses these exact types and signatures:
 
 ```text
@@ -424,7 +426,7 @@ Version `2` uses pre-flow supply and raises `hwm` to a higher `ppsFinal`. A stor
 
 ### Roll and reserves
 
-A normal roll requires `epoch != 0`, `epoch == lastProcessedEpoch + 1`, `epoch < currentEpoch`, and unprocessed state. Request ids strictly increase. Selection is oldest-first: a batch takes pending requests by ascending `queuedAt` (ties by ascending id), up to `maxSelectedRequestsPerLeg`; deferring an older request while selecting a younger one is invalid. The contract MUST reload every request, reject ineligible entries, calculate each output, and match roots, counts, totals, transfers, reserves, events, and final state.
+A normal roll requires `epoch != 0`, `epoch == lastProcessedEpoch + 1`, `epoch < currentEpoch`, and unprocessed state. Request ids strictly increase. Selection is oldest-first: a batch takes settleable pending requests by ascending `queuedAt` (ties by ascending id), up to `maxSelectedRequestsPerLeg`. A withdrawal whose output would be zero on a non-final roll is not settleable this epoch: it stores a zero output and stays pending. Excluding an older settleable request while selecting a younger one is invalid. The contract MUST reload every request, reject ineligible entries, calculate each output, and match roots, counts, totals, transfers, reserves, events, and final state.
 
 An empty leg has no ids and zero root, totals, and claims. A nonempty deposit leg and a non-final withdrawal leg require nonzero input and output totals. A zero non-final output stays pending. A final withdrawal may store zero asset outputs under the final-roll rules below.
 

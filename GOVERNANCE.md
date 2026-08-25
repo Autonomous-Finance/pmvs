@@ -16,10 +16,10 @@ A profile pins contract addresses and code hashes checked at a named block and d
 
 1. anyone may open an issue flagging staleness;
 2. maintainers verify against the chain and publish the next profile id with new pinned facts;
-3. the old id stays valid for records already anchored to it, and verifiers keep accepting historical evidence under the old id;
+3. the old id stays valid for records already anchored under it — their pinned facts do not move;
 4. vaults migrate by activating a components record selecting the new id.
 
-Until step 2 happens, verification fails closed (`UNSUPPORTED_PROFILE`), never open.
+Meanwhile, a verifier judging current vault state under a materially stale profile fails closed (`UNSUPPORTED_PROFILE`), never open.
 
 ## Questions and errata
 
