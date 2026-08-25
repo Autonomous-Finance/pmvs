@@ -70,7 +70,7 @@ A verifier:
 2. retrieves every raw venue response and checks its hash and time;
 3. reads the stated onchain blocks and rebuilds the complete custody inventory;
 4. reruns every mark and accounting step; and
-5. checks that the epoch, NAV, PPS, expiry, and valuation-record hash match the onchain commitment.
+5. checks that the epoch, PPS, expiry, and valuation-record hash match the onchain commitment. NAV lives inside the record; the commitment stores only the price.
 
 Missing, stale, unsupported, or inconsistent evidence fails verification. The [settlement profile](./pmvs-settlement.md) checks that the vault used that price and funded every resulting claim.
 

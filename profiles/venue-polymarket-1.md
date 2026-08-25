@@ -9,7 +9,7 @@
 | Created | 2026-08-18 |
 | Requires | PMVS Parts I through III; `position/gnosis-ctf/1` |
 
-This profile tells [M1](../pmvs-m1.md) how to value Polymarket positions on Polygon: find custody, prove each [Gnosis Conditional Tokens (CTF)](./position-gnosis-ctf-1.md) token, use a live book or resolved payout, convert collateral to pUSD, then pause fills before settlement. Missing evidence blocks valuation.
+This profile tells [M1](../pmvs-m1.md) how to value Polymarket positions on Polygon: find custody, prove each [Gnosis Conditional Tokens (CTF)](./position-gnosis-ctf-1.md) token, use a live book or resolved payout, convert collateral to pUSD (Polymarket's onchain dollar), then pause fills before settlement. Missing evidence blocks valuation.
 
 > Verified CTF holdings + Polymarket state -> this profile -> complete M1 venue snapshot
 
@@ -38,7 +38,7 @@ Polymarket uses CTF. Recompute each condition, collection, position, and CLOB as
 | Market type | Raw collateral | Resolution path |
 |---|---|---|
 | Standard | USDC.e | UMA CTF adapter |
-| Negative risk | WCOL backed by USDC.e | NegRisk adapter |
+| Negative risk | WCOL (Polymarket's wrapped-collateral token, redeemable 1:1 for USDC.e) backed by USDC.e | NegRisk adapter |
 
 Both routes end in pUSD, the vault's accounting and exchange asset. pUSD is not part of the CTF position id. The [venue schema](../schemas/venue-polymarket-1.schema.json) pins the exact Polygon addresses, code hashes, adapters, exchanges, factories, and profile constants.
 
@@ -84,7 +84,7 @@ Polymarket V2 orders have no signed expiry or cancellation nonce. API cancellati
 
 Before settlement, one direct helper contract, called the enforcer, MUST confirm the effective user pause for every custody account on both V2 exchanges. This stops venue fills. Claims and fees use separate, prefunded vault accounts outside strategy custody. That settlement transaction MUST NOT execute from strategy custody, change Safe controls or nonce, or mutate an exchange. The receipt proves the pause checks, call trace, and funding deltas.
 
-The pause does not stop a Safe owner from moving assets after capture. Version 1 detects that race after execution but cannot prevent it. Production needs onchain balance and control checks before settlement effects.
+The pause does not stop a Safe owner from moving assets after capture. Version 1 detects that race after execution but cannot prevent it. Production needs onchain balance and control checks before settlement effects. A freeze row may also carry the predicate `transfer-authorities-revoked`; in v1 it is diagnostic only, because pUSD is upgradeable and revoked authorities alone do not prove a safe freeze.
 
 External Safe custody also prevents complete onchain enumeration for a final all-supply exit. `supportsFinalRoll()` and `finalRollReady()` therefore return `false`.
 
