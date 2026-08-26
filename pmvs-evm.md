@@ -15,7 +15,7 @@ Most readers do not need this file. Read [Core](./pmvs-core.md), [Settlement](./
 
 > Parts + selected profiles -> EVM annex -> exact hashes, ABI, calls, and events
 
-**Contents:** [Common encoding](#common-encoding) · [Interface registry](#interface-registry) · [Configuration activation](#configuration-activation) · [Record anchor](#record-anchor) · [M1 valuation mechanics](#m1-valuation-mechanics) · [Settlement interface](#settlement-interface) · [Settlement mechanics](#settlement-mechanics) · [Merkle claims](#merkle-claims) · [Polymarket settlement call plan](#polymarket-settlement-call-plan) · [Verification result codes](#verification-result-codes)
+Contents: [Common encoding](#common-encoding), [Interface registry](#interface-registry), [Configuration activation](#configuration-activation), [Record anchor](#record-anchor), [M1 valuation mechanics](#m1-valuation-mechanics), [Settlement interface](#settlement-interface), [Settlement mechanics](#settlement-mechanics), [Merkle claims](#merkle-claims), [Polymarket settlement call plan](#polymarket-settlement-call-plan), and [Verification result codes](#verification-result-codes).
 
 This annex defines the exact EVM wire format and settlement mechanics. Implementations and verifiers MUST use the types, field order, hashes, calls, and events below. The [schemas](./schemas/README.md) define record shapes.
 
@@ -57,10 +57,10 @@ Every record kind has one permanent number. The number is the `kind` in attestat
 | 3 | Valuation | `valuation` |
 | 4 | Components | `components` |
 | 5 | Winddown opened | `winddown-opened` |
-| 6 | — reserved, never assign | — |
+| 6 | reserved, never assign | none |
 | 7 | Settlement archive | `settlement-archive` |
 | 8 | Retirement final | `retirement-final` |
-| 9 | — reserved for future kinds | — |
+| 9 | reserved for future kinds | none |
 | 10 | Watcher observation | `watcher-observation` |
 
 ## Interface registry

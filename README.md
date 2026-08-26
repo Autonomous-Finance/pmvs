@@ -57,12 +57,12 @@ Another backend may use a centralized engine, a different venue, or fully onchai
 
 PMVS makes a vault's claims checkable. It does not make them safe:
 
-- An operator can still publish wrong numbers. PMVS guarantees you can **prove they were wrong after the fact** — not that anyone stops them in time, and not that lost funds come back.
+- An operator can still publish wrong numbers. You can prove they were wrong after the fact. Nobody is stopped in time, and lost funds do not come back.
 - Verification only sees what the vault declares plus what the public chain shows. Value held on an undeclared account is invisible to it.
 - Venue prices arrive through APIs whose bytes PMVS cannot authenticate end to end.
 - Detection is never automatic: someone must run the checks.
 
-If those limits are acceptable for your vault, keep reading. If not, this standard cannot help you yet — see [PMVS-CHALLENGE](./standards-map.md), reserved future work on challenges and recourse.
+If those limits are acceptable for your vault, read on. If they are not, this standard cannot help you yet. [PMVS-CHALLENGE](./standards-map.md) is reserved future work on challenges and recourse.
 
 ## Lifecycle
 
@@ -119,11 +119,11 @@ Plain words for the terms this standard uses most:
 | Record / anchor | A signed JSON document describing what happened; anchoring stores its hash onchain in order. |
 | Leaf / Merkle claim | A user's stored payout in a settled batch, provable with a short proof path. |
 | Profile | A versioned rule set (venue, anchor, storage) selected by name in the components record. |
-| Valuation / settlement authority | The two roles allowed to publish prices and submit settlement batches — separate powers, named in the components record. |
+| Valuation / settlement authority | The two roles allowed to publish prices and submit settlement batches. Separate powers, both named in the components record. |
 | Backend boundary | The fixed seam between the offchain backend and the onchain vault: one price-publication call. |
 | High-water mark | The highest per-share price already fee'd; performance fee applies only above it. |
 | Watcher | An independent observer who publishes their own records about a vault. |
-| Recovery right | A recorded claim on vault value outside normal requests — e.g. funds sent to a wrong address. |
+| Recovery right | A recorded claim on vault value outside normal requests, such as funds sent to a wrong address. |
 
 ## Authors
 

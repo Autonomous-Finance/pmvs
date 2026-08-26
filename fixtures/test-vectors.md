@@ -2,7 +2,7 @@
 
 Golden vectors for the byte-exact rules in the [EVM annex](../pmvs-evm.md). Every input is fully specified so an implementer can verify each step by hand. All hashes were computed with two independent keccak implementations.
 
-## Vector 1 — PMVS-JCS record hash
+## Vector 1: PMVS-JCS record hash
 
 ```text
 record fields (JSON object):
@@ -18,7 +18,7 @@ recordHash = keccak256(UTF8(canonical bytes)) =
     0x50903abd298f4020931dd322ca11fb53913792f4dcecba02949dd5ea76d2eae0
 ```
 
-## Vector 2 — pmvs-merkle/1 leaf
+## Vector 2: pmvs-merkle/1 leaf
 
 All inputs:
 
@@ -43,7 +43,7 @@ leaf = keccak256(preimage) =
     0xcc88423ad1c7cbcee8c46378e5e844ff566ff4fafc053d55f2d0e973acab0f73
 ```
 
-## Vector 3 — three-leaf tree with count-prefixed root
+## Vector 3: three-leaf tree with count-prefixed root
 
 Same tag, chain, and settlement contract as vector 2. Leaves in selection order:
 

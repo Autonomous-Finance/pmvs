@@ -4,7 +4,7 @@ This is implementer and verifier reference material. Most readers should start w
 
 These machine-readable schemas support those Parts and the selected profiles. The [EVM annex](../pmvs-evm.md) defines hashes, calls, and events; the [standards map](../standards-map.md) records their design sources.
 
-Schema validation checks shape, not truth — and passing a validator is **not** conformance. Some `$comment` annotations in these files are normative: uniqueness, sorting, and completeness rules the PMVS verifier enforces even though a JSON-Schema validator ignores them. The [record-kind numbers](../pmvs-evm.md#common-encoding) live in the annex, not here. Semantic and evidence checks follow in the order below.
+Schema validation checks shape, not truth. Passing a validator is not conformance. Some `$comment` annotations in these files are normative: uniqueness, sorting, and completeness rules the PMVS verifier enforces even though a JSON-Schema validator ignores them. The [record-kind numbers](../pmvs-evm.md#common-encoding) live in the annex, not here. Semantic and evidence checks follow in the order below.
 
 | File | Purpose |
 |---|---|

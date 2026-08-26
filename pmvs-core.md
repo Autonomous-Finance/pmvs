@@ -76,7 +76,7 @@ Records cover configuration, valuation, settlement, receipts, retirement, correc
 
 An anchored record proves who committed which hash and when. It does not prove the record is true. A verifier MUST retrieve the bytes, reproduce the hash, check authority and order, then compare the claims with independent chain and venue evidence. Missing or unknown required data MUST fail closed.
 
-When verification fails, treat every later record as unproven until corrected: a broken chain of custody taints what follows it, not just the failing record. PMVS is evidence, not recourse — it makes dishonesty detectable after the fact; it cannot claw back an already settled epoch.
+When verification fails, treat every later record as unproven until corrected. A broken chain of custody taints what follows it, not just the failing record. The standard supplies evidence, not recourse: dishonesty becomes detectable after the fact, and nothing claws back a settled epoch.
 
 A correction may explain or annotate, but MUST NOT change the economics of an already-settled epoch: never NAV, price per share, fees, or outputs. After retirement the vault stream accepts only such non-economic corrections.
 
@@ -100,7 +100,7 @@ Zero NAV is an Active condition, not a new state. It stops price-dependent settl
 
 Retirement is permanent. It requires zero supply, requests, claims, reserves, positions, liabilities, and unresolved recovery rights. Cleanup happens before the final transaction. Failure leaves the vault Active.
 
-A recovery right is a recorded claim on vault value outside normal requests and funded claims — funds stranded at a wrong address under an earlier configuration, or an obligation named in a retirement-recovery manifest. A right exists once recorded, belongs to its named holder, and resolves only through its recorded resolution action or by a waiver signed by its holder.
+A recovery right is a recorded claim on vault value outside normal requests and funded claims: funds stranded at a wrong address under an earlier configuration, or an obligation named in a retirement-recovery manifest. A right exists once recorded, belongs to its named holder, and resolves only through its recorded resolution action or by a waiver signed by its holder.
 
 ## Conformance
 

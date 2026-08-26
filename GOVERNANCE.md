@@ -8,7 +8,7 @@ The authors listed in each document maintain the suite in the [Autonomous-Financ
 
 ## Identifiers
 
-Profile, method, and interface ids are minted **only** in this repository. An id names exactly one governing document at one version. A third party extending or forking a profile MUST use its own prefix (`venue/example/1`, not `venue/polymarket/1`) so records stay distinguishable. Colliding or shadow ids are rejected as `UNSUPPORTED_PROFILE`.
+Profile, method, and interface ids are minted only in this repository. An id names exactly one governing document at one version. A third party extending or forking a profile MUST use its own prefix (`venue/example/1`, not `venue/polymarket/1`) so records stay distinguishable. Colliding or shadow ids are rejected as `UNSUPPORTED_PROFILE`.
 
 ## Stale venue facts
 
@@ -16,7 +16,7 @@ A profile pins contract addresses and code hashes checked at a named block and d
 
 1. anyone may open an issue flagging staleness;
 2. maintainers verify against the chain and publish the next profile id with new pinned facts;
-3. the old id stays valid for records already anchored under it — their pinned facts do not move;
+3. the old id stays valid for records already anchored under it, whose pinned facts do not move;
 4. vaults migrate by activating a components record selecting the new id.
 
 Meanwhile, a verifier judging current vault state under a materially stale profile fails closed (`UNSUPPORTED_PROFILE`), never open.
