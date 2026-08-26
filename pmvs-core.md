@@ -64,7 +64,7 @@ The active configuration is recorded in a signed `components` record. The share 
 
 Governance, valuation, settlement, fee, and custody powers MUST be separate, explicit roles. The configuration names every holder, delegate, recovery source, and rotation authority.
 
-A replacement MUST be signed and anchored before activation. It names the current configuration, advances generation and nonce once, passes its declared checks, and performs only its declared migration. It MUST preserve every share and user right. Failure leaves the prior configuration active.
+A replacement MUST be signed and anchored before activation. It names the current configuration, advances generation and nonce once, passes its declared checks, and performs only its declared migration. It MUST preserve every share and user right, carry forward the fee high-water mark, and MUST NOT raise the performance-fee rate for the epoch then awaiting settlement; activation declares the checks that prove both. Failure leaves the prior configuration active.
 
 An anchor change also moves the latest record checkpoints in the same transaction. The [EVM annex](./pmvs-evm.md#configuration-activation) defines the exact activation and migration calls.
 
@@ -75,6 +75,10 @@ A PMVS record is canonical JSON with a content hash and authorized signature. An
 Records cover configuration, valuation, settlement, receipts, retirement, corrections, gaps, and independent watcher observations. The [schema](./schemas/pmvs-envelope-v1.schema.json) defines their exact kinds and fields.
 
 An anchored record proves who committed which hash and when. It does not prove the record is true. A verifier MUST retrieve the bytes, reproduce the hash, check authority and order, then compare the claims with independent chain and venue evidence. Missing or unknown required data MUST fail closed.
+
+When verification fails, treat every later record as unproven until corrected: a broken chain of custody taints what follows it, not just the failing record. PMVS is evidence, not recourse — it makes dishonesty detectable after the fact; it cannot claw back an already settled epoch.
+
+A correction may explain or annotate, but MUST NOT change the economics of an already-settled epoch: never NAV, price per share, fees, or outputs. After retirement the vault stream accepts only such non-economic corrections.
 
 ## Lifecycle and user rights
 
@@ -95,6 +99,8 @@ flowchart LR
 Zero NAV is an Active condition, not a new state. It stops price-dependent settlement but preserves cancellation, funded claims, and recovery rights.
 
 Retirement is permanent. It requires zero supply, requests, claims, reserves, positions, liabilities, and unresolved recovery rights. Cleanup happens before the final transaction. Failure leaves the vault Active.
+
+A recovery right is a recorded claim on vault value outside normal requests and funded claims — funds stranded at a wrong address under an earlier configuration, or an obligation named in a retirement-recovery manifest. A right exists once recorded, belongs to its named holder, and resolves only through its recorded resolution action or by a waiver signed by its holder.
 
 ## Conformance
 

@@ -15,7 +15,11 @@ Most readers do not need this file. Read [Core](./pmvs-core.md), [Settlement](./
 
 > Parts + selected profiles -> EVM annex -> exact hashes, ABI, calls, and events
 
+**Contents:** [Common encoding](#common-encoding) · [Interface registry](#interface-registry) · [Configuration activation](#configuration-activation) · [Record anchor](#record-anchor) · [M1 valuation mechanics](#m1-valuation-mechanics) · [Settlement interface](#settlement-interface) · [Settlement mechanics](#settlement-mechanics) · [Merkle claims](#merkle-claims) · [Polymarket settlement call plan](#polymarket-settlement-call-plan) · [Verification result codes](#verification-result-codes)
+
 This annex defines the exact EVM wire format and settlement mechanics. Implementations and verifiers MUST use the types, field order, hashes, calls, and events below. The [schemas](./schemas/README.md) define record shapes.
+
+**Compatibility note.** This is the v1 target wire format. The first Zeit reference deployment predates it: its settlement inputs carry a `dataURI` string this annex drops, its Merkle leaves are undomained 92-byte packed fields, and its zero-NAV roll permanently retires instead of winddown-and-restart. Those deployments conform to an earlier iteration, not this annex; a migration path is future work.
 
 ## Common encoding
 
@@ -40,6 +44,24 @@ Attestation(bytes32 recordHash,uint8 kind,bytes32 subjectId,bytes32 streamId,uin
 ```
 
 EOA signatures MUST satisfy [EIP-2](https://eips.ethereum.org/EIPS/eip-2) low-`s` rules. Contract signatures MUST return [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) magic value `0x1626ba7e` for this digest.
+
+### Record kinds
+
+Every record kind has one permanent number. The number is the `kind` in attestations, authority lookups, heads, and anchor events. The envelope schema names kinds by string, except watcher heads inside migrations, which carry the number directly.
+
+| Number | Record kind | String name |
+|---|---|---|
+| 0 | Gap | `gap` |
+| 1 | Correction | `correction` |
+| 2 | Receipt | `receipt` |
+| 3 | Valuation | `valuation` |
+| 4 | Components | `components` |
+| 5 | Winddown opened | `winddown-opened` |
+| 6 | — reserved, never assign | — |
+| 7 | Settlement archive | `settlement-archive` |
+| 8 | Retirement final | `retirement-final` |
+| 9 | — reserved for future kinds | — |
+| 10 | Watcher observation | `watcher-observation` |
 
 ## Interface registry
 
@@ -216,6 +238,8 @@ The event stores `signatureHash = keccak256(signature)`. Watcher streams use:
 streamId = keccak256(abi.encodePacked("PMVS:WATCHER:1", signer))
 ```
 
+A finalized subject accepts commits only for records whose kind is `correction` (`1`).
+
 Anchor migration uses these exact types and signatures:
 
 ```text
@@ -240,9 +264,18 @@ event PMVSAnchorMigrated(
 
 ## M1 valuation mechanics
 
-The active method names its engine, version, source commit, artifact hash, and parameters. The named source and artifact MUST be publicly retrievable and hash-match the record. Its parameters are `maxSkewMs`, `maxVenueResponseLagMs`, `maxCaptureAgeMs`, `minPositionSize`, `zeroBidObservations`, `zeroBidWindowMs`, `maxPositionUnfilledPayout`, and `maxAggregateUnfilledPayout`. Times use milliseconds. Payout caps use accounting-asset base units.
+The active method names its engine, version, source commit, artifact hash, and parameters. The named source and artifact MUST be publicly retrievable and hash-match the record. Its parameters are:
 
-Every observation MUST fall within `[startedAtMs, endedAtMs]`. The total skew MUST NOT exceed `maxSkewMs`. A venue response MUST end no earlier than its venue timestamp and no more than `maxVenueResponseLagMs` later. Settlement expiry is:
+| Parameter | Meaning |
+|---|---|
+| `maxSkewMs` | Capture-window span limit: `endedAtMs - startedAtMs` MUST NOT exceed it. |
+| `maxVenueResponseLagMs` | How long after its venue timestamp a captured response may still end (`responseEndMs - venueTimeMs`). |
+| `maxCaptureAgeMs` | How long after `endedAtMs` a price stays settleable; sets `validUntil`. |
+| `minPositionSize` | Minimum held size in the venue's native quantity unit. Smaller live positions are disclosed as `excluded_negligible`, marked zero, and counted toward both unfilled-exposure caps by their maximum payout. |
+| `zeroBidObservations` / `zeroBidWindowMs` | A live position MAY use `writeoff_zero_bid` only when at least `zeroBidObservations` valid book captures, each at least `zeroBidWindowMs` after the previous one, ALL show an empty book within `[startedAtMs, endedAtMs]`. A missing response never proves zero bids. |
+| `maxPositionUnfilledPayout` / `maxAggregateUnfilledPayout` | Per-position and portfolio-wide caps on maximum payout of unsold exposure; exceeding either fails valuation. |
+
+Every observation MUST fall within `[startedAtMs, endedAtMs]`. A venue response MUST end no earlier than its venue timestamp and no more than `maxVenueResponseLagMs` later. Settlement expiry is:
 
 ```text
 validUntil = floor((endedAtMs + maxCaptureAgeMs) / 1000)
@@ -260,7 +293,7 @@ mark      = grossMark - venueExitCost
 The venue profile fixes the scale, exit cost, collateral conversion, payout rules, and exposure caps. Resolved collateral follows its complete declared route into the accounting asset. The record stores filled and unfilled size, exit cost, mark, and maximum payout. A position below `minPositionSize` remains disclosed as `excluded_negligible`, is marked zero, and adds its maximum payout to both unfilled-exposure caps. Bad levels, overflow, impossible payouts, stale books, or material unsold exposure fail. Valid repeated empty books may prove zero bids; a missing response cannot.
 
 ```text
-grossAssets = cashValue + overlayValue + positionsValue
+grossAssets = cashValue + positionsValue
 navSigned   = grossAssets - liabilities
 nav         = max(navSigned, 0)
 
@@ -268,9 +301,11 @@ pps = floor(nav * 10^shareDecimals * 10^18
             / (totalSupply * 10^assetDecimals))
 ```
 
-Cash includes every controlled accounting-asset balance, including escrow and reserves. `overlayValue` is other declared value, such as a cross-chain claim. Asset-denominated escrow, funded withdrawals, asset fee claims, debt, and operating obligations are liabilities. Share-denominated claims remain in supply and MUST NOT reduce NAV again. Internal transfers do not change NAV. Positive supply with zero NAV gives zero PPS. Zero supply uses `initialPps`. Unexplained assets with zero supply return `UNALLOCATED_ASSETS`. `referencePps` is display-only and MUST NOT settle requests. Arithmetic uses bounded integers and exact decimal parsing, never IEEE-754.
+Cash includes every controlled accounting-asset balance, including escrow and reserves. Overlay lines are out of scope in v1: any nonzero overlay line fails valuation (`UNVERIFIABLE_INPUTS`). Asset-denominated escrow, funded withdrawals, asset fee claims, debt, and operating obligations are liabilities. Share-denominated claims remain in supply and MUST NOT reduce NAV again. Internal transfers do not change NAV. Positive supply with zero NAV gives zero PPS; such an epoch settles as zero NAV until NAV recovers above one unit of PPS precision. Zero supply uses `initialPps`. Unexplained assets with zero supply return `UNALLOCATED_ASSETS`. `referencePps` is display-only and MUST NOT settle requests. Arithmetic uses bounded integers and exact decimal parsing, never IEEE-754.
 
-Positions sort by numeric chain id, contract, and numeric token id. Holdings sort by account, accounting lines by UTF-16 `id`, and bids by descending price. Settlement records use an epoch and null slot. Periodic records use a slot and null epoch; missing periodic observations use gap records. A behavior-changing valuation or fee rule requires a new method or profile id.
+Positions sort by numeric chain id, contract, and numeric token id. Holdings sort by account, accounting lines by UTF-16 `id`, and bids by descending price. Settlement records use an epoch and null slot. Periodic records use a slot and null epoch; missing periodic observations use gap records.
+
+The components publication declares the periodic-capture parameters: `captureWindowSeconds` bounds how long one valuation's capture may span (consistent with `maxSkewMs`); `graceSeconds` extends each expected slot before it counts as missed; `cadence` names the slot origin, interval, evaluation window, and `maxConsecutiveGaps`. More than `maxConsecutiveGaps` consecutive missed slots within one evaluation window invalidates any L3 claim until a valuation fills a later slot. A behavior-changing valuation or fee rule requires a new method or profile id.
 
 The selected venue profile defines the settlement freeze. If custody or trading can change after capture without an onchain recheck, the result is diagnostic and cannot claim L1.
 
@@ -362,7 +397,7 @@ A deposit locks accounting assets. A withdrawal locks shares. The request owner 
 
 Epochs start at `1`. Advancing requires the supplied epoch to equal both `currentEpoch` and `lastProcessedEpoch + 1`. Only one epoch may await settlement. Only the declared settlement authority may freeze an epoch or submit a roll.
 
-Price attempts are consecutive positive integers. Publication stores an immutable `(components, grossPps, valuationRecord, validUntil)` tuple. A roll MUST load the current tuple, match the active components and selected attempt, and execute no later than `validUntil`. An expired attempt may be followed by the next attempt; no attempt may be overwritten.
+Price attempts are consecutive positive integers. Publication stores an immutable `(components, grossPps, valuationRecord, validUntil)` tuple. A roll MUST load the current tuple via `currentPriceAttempt(epoch)`, match the active components and that exact attempt, and execute no later than `validUntil`. An expired attempt may be followed by the next attempt; no attempt may be overwritten; a roll MUST NOT settle against any earlier attempt it does not name.
 
 ### Price and fee math
 
@@ -391,11 +426,11 @@ Version `2` uses pre-flow supply and raises `hwm` to a higher `ppsFinal`. A stor
 
 ### Roll and reserves
 
-A normal roll requires `epoch != 0`, `epoch == lastProcessedEpoch + 1`, `epoch < currentEpoch`, and unprocessed state. Request ids strictly increase. The contract MUST reload every request, reject ineligible entries, calculate each output, and match roots, counts, totals, transfers, reserves, events, and final state.
+A normal roll requires `epoch != 0`, `epoch == lastProcessedEpoch + 1`, `epoch < currentEpoch`, and unprocessed state. Request ids strictly increase. Selection is oldest-first: a batch takes settleable pending requests by ascending `queuedAt` (ties by ascending id), up to `maxSelectedRequestsPerLeg`. A withdrawal whose output would be zero on a non-final roll is not settleable this epoch: it stores a zero output and stays pending. Excluding an older settleable request while selecting a younger one is invalid. The contract MUST reload every request, reject ineligible entries, calculate each output, and match roots, counts, totals, transfers, reserves, events, and final state.
 
 An empty leg has no ids and zero root, totals, and claims. A nonempty deposit leg and a non-final withdrawal leg require nonzero input and output totals. A zero non-final output stays pending. A final withdrawal may store zero asset outputs under the final-roll rules below.
 
-Validation is `O(n)` and MUST enforce a gas-tested `maxSelectedRequestsPerLeg`. New deployments use `ROLL_SETTLEMENT_VERSION() == 2`. Version `1` requires pinned bytecode and proof that the v2 selector is absent.
+Validation is `O(n)` and MUST enforce a gas-tested batch cap, `maxSelectedRequestsPerLeg`, declared in `profileParameters["settlement/epoch-merkle/1"]` next to the liveness parameters. New deployments use `ROLL_SETTLEMENT_VERSION() == 2`. Version `1` requires pinned bytecode and proof that the v2 selector is absent.
 
 After the roll:
 
@@ -474,7 +509,7 @@ node = keccak256(0x01 || min(left,right) || max(left,right))
 root = count == 0 ? bytes32(0) : keccak256(0x02 || be(count,32) || rawTreeRoot)
 ```
 
-`be(x,n)` is the `n`-byte big-endian encoding. `rawTreeRoot` is the complete unprefixed root. `leg` is `0` for deposits and `1` for withdrawals. Leaves follow selected request ids. Siblings sort bytewise; odd nodes self-pair.
+`be(x,n)` is the `n`-byte big-endian encoding. `rawTreeRoot` is the complete unprefixed root. `leg` is `0` for deposits and `1` for withdrawals. Leaves follow selected request ids. Siblings sort bytewise; odd nodes self-pair. [Test vectors](./fixtures/test-vectors.md) cover a full three-leaf tree.
 
 Verification checks count, zero-based index, tree size, and self-pairs. Onchain selection stores `leafIndex + 1`, so zero means unselected. Archive ids, transaction ids, and leaves MUST match in order.
 
@@ -490,7 +525,7 @@ custodyAccount = CREATE2(
   0x2bce2127ff07fb632d16c8347c4ebf501f4841168bed00d9e6ef715ddb6fcecf)
 ```
 
-The proxy runtime hash is `0x92565062fdea8761e07d9df2fcdbd66c0582af6ddf0e0355bc07754ad97400b0`; the singleton is `0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8`. The venue schema pins the remaining code hashes and addresses.
+The proxy runtime hash is `0x92565062fdea8761e07d9df2fcdbd66c0582af6ddf0e0355bc07754ad97400b0`; the singleton is `0xe51abdf814f8854941b9fe8e3a4f65cab4e7a4a8`. The venue schema pins the remaining addresses and runtime code hashes; the CREATE2 init-code hash above lives only here.
 
 Negative-risk question ids decode as:
 

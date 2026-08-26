@@ -53,6 +53,17 @@ The vault recalculates each request output and funds it before a claim. A verifi
 
 Another backend may use a centralized engine, a different venue, or fully onchain data through the same boundary.
 
+## What PMVS does not do
+
+PMVS makes a vault's claims checkable. It does not make them safe:
+
+- An operator can still publish wrong numbers. PMVS guarantees you can **prove they were wrong after the fact** — not that anyone stops them in time, and not that lost funds come back.
+- Verification only sees what the vault declares plus what the public chain shows. Value held on an undeclared account is invisible to it.
+- Venue prices arrive through APIs whose bytes PMVS cannot authenticate end to end.
+- Detection is never automatic: someone must run the checks.
+
+If those limits are acceptable for your vault, keep reading. If not, this standard cannot help you yet — see [PMVS-CHALLENGE](./standards-map.md), reserved future work on challenges and recourse.
+
 ## Lifecycle
 
 ```mermaid
@@ -88,7 +99,31 @@ Most readers can stop there. A deployment then selects only the profiles it uses
 
 Contract implementers and verifier authors use the [EVM implementation annex](./pmvs-evm.md) for exact hashes, structs, calls, selectors, formulas, and events. The [schemas](./schemas/README.md) define machine-readable records. These annexes are reference material, not the introductory reading path.
 
-The [standards and design lineage map](./standards-map.md) says what PMVS adopts, adapts, depends on, or cites as related work.
+The [standards and design lineage map](./standards-map.md) says what PMVS adopts, adapts, depends on, or cites as related work. How the standard is maintained and how profile ids are governed: [GOVERNANCE.md](./GOVERNANCE.md).
+
+## Glossary
+
+Plain words for the terms this standard uses most:
+
+| Term | Meaning |
+|---|---|
+| Share | The vault's single ERC-20 token; each share is the same proportional claim on the whole vault. |
+| NAV / price per share | What the vault owns minus what it owes; the per-share slice of that value. |
+| Custody account | An address where the strategy holds venue positions or cash. |
+| Accounting asset | The currency NAV is measured in (for a Polymarket vault, pUSD). |
+| Backend | The offchain engine that finds every asset, computes NAV, and proposes a settlement batch. It never holds user funds. |
+| Components record | The signed configuration naming every contract, role, and profile a vault uses. |
+| Epoch | One settlement round: one snapshot, one price, one batch of queued requests. |
+| Batch / selection | The ordered set of pending requests an epoch settles. |
+| Roll | The transaction that applies one batch at its epoch's price. |
+| Record / anchor | A signed JSON document describing what happened; anchoring stores its hash onchain in order. |
+| Leaf / Merkle claim | A user's stored payout in a settled batch, provable with a short proof path. |
+| Profile | A versioned rule set (venue, anchor, storage) selected by name in the components record. |
+| Valuation / settlement authority | The two roles allowed to publish prices and submit settlement batches — separate powers, named in the components record. |
+| Backend boundary | The fixed seam between the offchain backend and the onchain vault: one price-publication call. |
+| High-water mark | The highest per-share price already fee'd; performance fee applies only above it. |
+| Watcher | An independent observer who publishes their own records about a vault. |
+| Recovery right | A recorded claim on vault value outside normal requests — e.g. funds sent to a wrong address. |
 
 ## Authors
 

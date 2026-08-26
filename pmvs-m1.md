@@ -53,7 +53,7 @@ The backend pins each chain to one block and each venue response to its raw byte
 A resolved position uses its onchain payout. A live position uses the captured bids, from best to worst, less the declared exit cost. The venue profile defines the exact price scale, fees, collateral conversion, and limits on unsold exposure.
 
 ```text
-gross assets = cash + other declared assets + position values
+gross assets = cash + position values
 NAV          = max(gross assets - liabilities, 0)
 
 PPS = floor(NAV * 10^shareDecimals * 10^18
@@ -70,7 +70,7 @@ A verifier:
 2. retrieves every raw venue response and checks its hash and time;
 3. reads the stated onchain blocks and rebuilds the complete custody inventory;
 4. reruns every mark and accounting step; and
-5. checks that the epoch, NAV, PPS, expiry, and valuation-record hash match the onchain commitment.
+5. checks that the epoch, PPS, expiry, and valuation-record hash match the onchain commitment. NAV lives inside the record; the commitment stores only the price.
 
 Missing, stale, unsupported, or inconsistent evidence fails verification. The [settlement profile](./pmvs-settlement.md) checks that the vault used that price and funded every resulting claim.
 

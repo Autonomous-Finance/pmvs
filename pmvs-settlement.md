@@ -50,6 +50,8 @@ A deposit locks accounting assets in the vault. A withdrawal locks vault shares.
 
 The owner MAY cancel while the request is pending and recover the exact input. A delegate may submit a request or claim, but delegation does not transfer ownership.
 
+"Deadline remedy" appears throughout this Part: in `bounded` request-liveness mode, a pending request that passes its deadline can be refunded or delivered by anyone, not just the operator. See [When normal settlement stops](#when-normal-settlement-stops).
+
 ### 2. Price
 
 [M1](./pmvs-m1.md) defines how the backend freezes one portfolio snapshot, reconstructs custody, calculates NAV, and produces the price evidence. The backend proposes an ordered batch. The valuation authority publishes:
@@ -61,6 +63,8 @@ The owner MAY cancel while the request is pending and recover the exact input. A
 ```text
 (epoch, priceAttempt) -> (components, grossPps, valuationRecord, validUntil)
 ```
+
+(The wire call orders its arguments differently; the [EVM annex](./pmvs-evm.md#backend-boundary) is exact.)
 
 The boundary profile is `backend/settlement/1`. `components` identifies the active vault configuration. `grossPps` is the pre-fee price per share. `valuationRecord` points to the evidence. `validUntil` limits how long the price may be used.
 
@@ -79,7 +83,9 @@ The settlement authority submits ordered deposit and withdrawal request ids. The
 
 This transaction is the roll. All six steps happen together. Any mismatch MUST revert the entire roll. The contract does not decide whether the backend's NAV is correct. PMVS verification checks that separately.
 
-Deposits receive shares. Withdrawals receive accounting assets. The final price equals the published gross price after the declared performance fee. All arithmetic, rounding, fee, epoch, batch-size, and reserve rules are fixed in the [EVM settlement mechanics](./pmvs-evm.md#settlement-mechanics).
+Deposits receive shares. Withdrawals receive assets. The final price equals the published gross price after the declared performance fee. All arithmetic, rounding, fee, epoch, batch-size, and reserve rules are fixed in the [EVM settlement mechanics](./pmvs-evm.md#settlement-mechanics).
+
+The batch takes pending requests oldest-first, up to a declared per-leg cap. A request the batch does not take stays pending: it keeps its place for a later epoch, may be cancelled while pending, and gains its deadline remedy if never selected. A zero output on a non-final withdrawal also stays pending. Nothing about your request changes by being skipped.
 
 ### 4. Claim
 
@@ -120,7 +126,7 @@ Normal rolls use a `settlement-archive`; zero-NAV rolls use `winddown-opened`; r
 
 Apply [Core's cumulative conformance levels](./pmvs-core.md#conformance). Settlement MUST prove complete request history, authenticated pricing, exact arithmetic, funded reserves, valid claims, transaction effects, and any required deadline or retirement state.
 
-This profile requires exact transfers, 18 share decimals, and `10^18` prices. Transfer fees, rebases, unsafe hooks, or blocked remedies require another profile. See [standards and design lineage](./standards-map.md) for external conformance boundaries.
+This profile (`backend/settlement/1`) requires exact transfers, 18-decimal shares, and `10^18` prices. Vaults with other decimals need another settlement profile. Transfer fees, rebases, unsafe hooks, or blocked remedies also require another profile. See [standards and design lineage](./standards-map.md) for external conformance boundaries.
 
 ## References
 
