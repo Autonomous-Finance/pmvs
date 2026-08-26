@@ -7,10 +7,6 @@
 | Created | 2026-08-18 |
 | Scope | ERC-20 vault shares backed by prediction-market positions |
 
-PMVS adapts the [Boring Vault architecture](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/README.md) separation of shares, accounting, and asset control. It uses [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) units, conversion, and rounding.
-
-Settlement adapts [ERC-7540's asynchronous request lifecycle](https://eips.ethereum.org/EIPS/eip-7540#request-lifecycle) and [Uniswap's MerkleDistributor](https://github.com/Uniswap/merkle-distributor/blob/25a79e8ec8c22076a735b1a675b961c8184e7931/contracts/MerkleDistributor.sol) claim pattern. PMVS adds epoch batching, price evidence, reserved funding, cancellation, and deadlines through a custom ABI. These are design sources, not conformance claims.
-
 > Public method + frozen market and vault data -> reproducible net asset value (NAV) -> onchain settlement -> shares or funded withdrawal claims
 
 ## Why PMVS
@@ -19,9 +15,15 @@ A [prediction-market outcome token](https://github.com/gnosis/conditional-tokens
 
 A rolling strategy needs one investor token that survives those resolutions. The strategy can exit old positions and move capital into new markets without issuing investors a new token each time. A PMVS vault may also hold just one outcome position. In either case, its share represents the investor's proportional part of the complete vault NAV and can remain active as long as the vault does.
 
+The hard part is trust. On the largest venues, the prices that set NAV live in offchain order books, so a holder cannot recompute the share price from chain data alone. PMVS fixes the disclosure: each valuation names its method and frozen inputs, each settlement binds to that evidence, and anyone can rerun the calculation.
+
 Wallets, AMMs, lending markets, and aggregators can integrate one stable ERC-20 address. PMVS defines the custody, accounting, settlement, and replacement rules that preserve its meaning.
 
 ## How PMVS works
+
+PMVS adapts the separation of shares, accounting, and asset control from the [Boring Vault architecture](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/README.md). It uses [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) units, conversion, and rounding.
+
+Settlement adapts [ERC-7540's asynchronous request lifecycle](https://eips.ethereum.org/EIPS/eip-7540#request-lifecycle) and [Uniswap's MerkleDistributor](https://github.com/Uniswap/merkle-distributor/blob/25a79e8ec8c22076a735b1a675b961c8184e7931/contracts/MerkleDistributor.sol) claim pattern. PMVS adds epoch batching, price evidence, reserved funding, cancellation, and deadlines through a custom ABI. These are design sources, not conformance claims.
 
 Vault contracts hold requests, issue shares, and fund claims. A replaceable backend publishes its method and snapshot, values every declared custody account, and proposes a price and batch. The valuation authority publishes the price; the settlement authority submits the batch.
 
@@ -55,12 +57,12 @@ Another backend may use a centralized engine, a different venue, or fully onchai
 
 ## What PMVS does not do
 
-PMVS makes a vault's claims checkable. It does not make them safe:
+PMVS makes a vault's published accounting checkable. It does not make it safe:
 
 - An operator can still publish wrong numbers. You can prove they were wrong after the fact. Nobody is stopped in time, and lost funds do not come back.
 - Verification only sees what the vault declares plus what the public chain shows. Value held on an undeclared account is invisible to it.
-- Venue prices arrive through APIs whose bytes PMVS cannot authenticate end to end.
-- Detection is never automatic: someone must run the checks.
+- When a profile reads venue prices through an API, PMVS binds the captured bytes but cannot authenticate the upstream response end to end.
+- Detection is not built in: a person or service must run the checks.
 
 If those limits are acceptable for your vault, read on. If they are not, this standard cannot help you yet. [PMVS-CHALLENGE](./standards-map.md) is reserved future work on challenges and recourse.
 
@@ -108,10 +110,11 @@ Plain words for the terms this standard uses most:
 | Term | Meaning |
 |---|---|
 | Share | The vault's single ERC-20 token; each share is the same proportional claim on the whole vault. |
-| NAV / price per share | What the vault owns minus what it owes; the per-share slice of that value. |
+| NAV | What the vault owns minus what it owes, floored at zero. |
+| Price per share (PPS) | The NAV slice one whole share represents; with zero shares outstanding, the declared initial price. |
 | Custody account | An address where the strategy holds venue positions or cash. |
 | Accounting asset | The currency NAV is measured in (for a Polymarket vault, pUSD). |
-| Backend | The offchain engine that finds every asset, computes NAV, and proposes a settlement batch. It never holds user funds. |
+| Backend | The offchain engine that inventories every declared custody account, computes NAV, and proposes a settlement batch. It never holds user funds. |
 | Components record | The signed configuration naming every contract, role, and profile a vault uses. |
 | Epoch | One settlement round: one snapshot, one price, one batch of queued requests. |
 | Batch / selection | The ordered set of pending requests an epoch settles. |
@@ -121,7 +124,7 @@ Plain words for the terms this standard uses most:
 | Profile | A versioned rule set (venue, anchor, storage) selected by name in the components record. |
 | Valuation / settlement authority | The two roles allowed to publish prices and submit settlement batches. Separate powers, both named in the components record. |
 | Backend boundary | The fixed seam between the offchain backend and the onchain vault: one price-publication call. |
-| High-water mark | The highest per-share price already fee'd; performance fee applies only above it. |
+| High-water mark | The highest per-share price on which the performance fee was already charged; new fees apply only above it. |
 | Watcher | An independent observer who publishes their own records about a vault. |
 | Recovery right | A recorded claim on vault value outside normal requests, such as funds sent to a wrong address. |
 

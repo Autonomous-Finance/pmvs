@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/venue-polymarket-1.schema.json",
+  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.5/schemas/venue-polymarket-1.schema.json",
   "title": "PMVS Polymarket venue state profile v1",
   "description": "Machine shape for the Polymarket-specific custody, market, collateral, order, redemption, and settlement-freeze evidence used by the included backend.",
   "type": "object",
@@ -642,7 +642,7 @@
     },
     "standardVenuePosition": {
       "allOf": [
-        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/position-gnosis-ctf-1.schema.json" },
+        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.5/schemas/position-gnosis-ctf-1.schema.json" },
         {
           "type": "object",
           "required": ["profile", "chainId", "positionContract", "custodyAccount", "collateralToken", "oracle", "questionId", "outcomeSlotCount", "conditionId", "parentCollectionId", "indexSet", "collectionId", "positionId", "quantity"],
@@ -674,7 +674,7 @@
     },
     "negativeRiskVenuePosition": {
       "allOf": [
-        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/position-gnosis-ctf-1.schema.json" },
+        { "$ref": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.5/schemas/position-gnosis-ctf-1.schema.json" },
         {
           "type": "object",
           "required": ["profile", "chainId", "positionContract", "custodyAccount", "collateralToken", "oracle", "questionId", "outcomeSlotCount", "conditionId", "parentCollectionId", "indexSet", "collectionId", "positionId", "quantity"],

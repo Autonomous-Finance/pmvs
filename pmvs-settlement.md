@@ -50,7 +50,7 @@ A deposit locks accounting assets in the vault. A withdrawal locks vault shares.
 
 The owner MAY cancel while the request is pending and recover the exact input. A delegate may submit a request or claim, but delegation does not transfer ownership.
 
-"Deadline remedy" appears throughout this Part: in `bounded` request-liveness mode, a pending request that passes its deadline can be refunded or delivered by anyone, not just the operator. See [When normal settlement stops](#when-normal-settlement-stops).
+"Deadline remedy" appears throughout this Part: in `bounded` request-liveness mode, once a deadline passes, anyone, not just the operator, may refund an unselected request's locked input or deliver a selected request's stored output. See [When normal settlement stops](#when-normal-settlement-stops).
 
 ### 2. Price
 
@@ -85,7 +85,7 @@ This transaction is the roll. All six steps happen together. Any mismatch MUST r
 
 Deposits receive shares. Withdrawals receive assets. The final price equals the published gross price after the declared performance fee. All arithmetic, rounding, fee, epoch, batch-size, and reserve rules are fixed in the [EVM settlement mechanics](./pmvs-evm.md#settlement-mechanics).
 
-The batch takes pending requests oldest-first, up to a declared per-leg cap. A request the batch does not take stays pending: it keeps its place for a later epoch, may be cancelled while pending, and gains its deadline remedy if never selected. A zero output on a non-final withdrawal also stays pending. Nothing about your request changes by being skipped.
+The batch takes settleable pending requests oldest-first, up to a declared per-leg cap; deposits and withdrawals settle as separate legs. A request the batch does not take stays pending: it keeps its place for a later epoch, may be cancelled while pending, and gains its deadline remedy if never selected. A zero output on a non-final withdrawal also stays pending. Nothing about your request changes by being skipped.
 
 ### 4. Claim
 
@@ -105,7 +105,7 @@ The claim pattern adapts [Uniswap's MerkleDistributor](https://github.com/Uniswa
 | Durable rights | Pending requests remain cancellable or gain a deadline remedy. Funded claims remain payable once. |
 | Independent proof | Records bind the price evidence, batch, transaction, events, and resulting state. |
 
-Claim reserves MUST NOT be lent, staked, bridged, pledged, counted as free NAV, approved for another use, or paid from another reserve. A configuration change MUST move requests and reserves without creating a second claim path.
+Claim reserves MUST NOT be lent, staked, bridged, pledged, counted as free NAV, approved for another use, or paid from another reserve. A configuration change MUST preserve every pending request, reserve, and funded claim; if it migrates them to new components, exactly one valid claim path remains.
 
 ## When normal settlement stops
 
@@ -114,7 +114,7 @@ Claim reserves MUST NOT be lent, staked, bridged, pledged, counted as free NAV, 
 | Situation | Result |
 | --- | --- |
 | A request or funded claim passes its deadline | Bounded mode lets anyone complete the refund or delivery. Operator-dependent mode has no deadline and is not production-ready. |
-| NAV is zero | Record the zero price, settle no requests, and pause deposits. No funds, shares, claims, reserves, or fees change. Cancellations and funded claims continue. A later positive price can restart settlement. |
+| NAV is zero | Record the zero price and settle no requests. The roll changes no funds, shares, claims, reserves, or fees; deposits cannot settle until a positive price returns. Cancellations and funded claims continue. |
 | The last holders withdraw | Allow this only when no other registered asset or position remains. Divide all free accounting assets by a fixed pro-rata rule. |
 | The vault retires | First clear all shares, assets, requests, claims and their funding, positions, liabilities, and recovery rights. The final transaction makes retirement permanent. If it fails, the vault stays Active. |
 

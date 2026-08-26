@@ -13,7 +13,7 @@
 
 > Public method + frozen venue data + pinned vault state -> M1 -> net asset value and price-per-share record
 
-Most large prediction markets are not fully onchain. [Polymarket](https://docs.polymarket.com/trading/overview) matches orders offchain, and [Kalshi](https://docs.kalshi.com/api-reference/market/get-market-orderbook) publishes its books through an API. The vault's shares and balances may be onchain while the prices needed for net asset value (NAV) are not.
+The largest prediction markets are not fully onchain. [Polymarket](https://docs.polymarket.com/trading/overview) matches orders offchain, and [Kalshi](https://docs.kalshi.com/api-reference/market/get-market-orderbook) publishes its books through an API. The vault's shares and balances may be onchain while the prices needed for net asset value (NAV) are not.
 
 M1 makes that bridge auditable. For each settlement epoch, the backend publishes its valuation method and the exact onchain and offchain inputs it used. The valuation authority, which is allowed to publish prices, commits the record and price onchain. Anyone can retrieve the inputs, run the method, and compare the NAV and price per share (PPS).
 
@@ -60,7 +60,7 @@ PPS = floor(NAV * 10^shareDecimals * 10^18
             / (total share supply * 10^assetDecimals))
 ```
 
-Cash includes every controlled balance of the accounting asset, which is the asset used to measure NAV. Liabilities are subtracted once so nothing is counted twice.
+Cash includes every controlled balance of the accounting asset, which is the asset used to measure NAV. Liabilities are subtracted once so nothing is counted twice. Zero share supply uses the declared initial PPS instead of this formula.
 
 ## How anyone verifies it
 
@@ -70,11 +70,11 @@ A verifier:
 2. retrieves every raw venue response and checks its hash and time;
 3. reads the stated onchain blocks and rebuilds the complete custody inventory;
 4. reruns every mark and accounting step; and
-5. checks that the epoch, PPS, expiry, and valuation-record hash match the onchain commitment. NAV lives inside the record; the commitment stores only the price.
+5. checks that the epoch, PPS, expiry, and valuation-record hash match the onchain commitment. NAV lives inside the record; the onchain commitment stores the price together with the components hash, valuation-record hash, and expiry.
 
 Missing, stale, unsupported, or inconsistent evidence fails verification. The [settlement profile](./pmvs-settlement.md) checks that the vault used that price and funded every resulting claim.
 
-M1 v1 standardizes the evidence and checks. Each backend still has its own engine. Anyone can rerun the named public implementation, but PMVS has no universal reference engine yet. This supports L1 verification, not L2 or L3. A future closed engine can add cross-implementation replay without changing the vault's [Settlement boundary](./pmvs-settlement.md#backend-boundary).
+M1 v1 standardizes the evidence and checks. Each backend still has its own engine. Anyone can rerun the named public implementation, but PMVS has no universal reference engine yet. This supports L1 verification, not L2 or L3: rerunning the operator's own published engine checks consistency, but v1 does not pin the method tightly enough that independent implementations must agree. A future exactly specified engine can add cross-implementation replay without changing the vault's [Settlement boundary](./pmvs-settlement.md#backend-boundary).
 
 The [M1 machine rules](./pmvs-evm.md#m1-valuation-mechanics) define exact timing, arithmetic, ordering, failure cases, and record fields. The [schemas](./schemas/README.md) define their machine-readable shape.
 

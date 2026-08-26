@@ -45,7 +45,7 @@ leaf = keccak256(preimage) =
 
 ## Vector 3: three-leaf tree with count-prefixed root
 
-Same tag, chain, and settlement contract as vector 2. Leaves in selection order:
+Same tag, chain, and settlement contract as vector 2. This vector mixes deposit and withdrawal legs to exercise the leaf encoding; a real epoch builds one tree per leg, so this exact tree cannot appear as a deposit or withdrawal root. Leaves in selection order:
 
 | # | leg | requestId | owner | amount | leaf |
 |---|---|---|---|---|---|
@@ -66,4 +66,4 @@ root        = keccak256(0x02 || be(count=3,32) || rawTreeRoot)
     = 0x49df9c57ee3e8c4feff2c1a6efca914ec6692fb5a6c89798fbe6c9d6d782761e
 ```
 
-A proof for leaf index 1 uses sibling `n2`; a proof for index 0 or 2 uses the other branch's node at level 1.
+A proof for leaf 0 is `[L1, n2]`; for leaf 1, `[L0, n2]`. Leaf 2 self-pairs at level 0, then uses `n01`.

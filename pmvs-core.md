@@ -49,7 +49,7 @@ These rules MUST always hold:
 | Invariant | Meaning |
 |---|---|
 | One share class | Every share has the same proportional claim on the whole vault. |
-| Complete accounting | NAV includes every controlled asset, receivable, reserve, claim, and liability unless a selected profile gives a reason to exclude it. |
+| Complete accounting | NAV accounts exactly once for every controlled asset, receivable, reserve, claim, and liability; a selected profile may exclude an item only under an explicit rule. |
 | No internal profit | Moving value between declared custody accounts does not change NAV. |
 | Fair conversion | Deposit and withdrawal prices use complete NAV, including liabilities and funded claims. |
 | Exact units | Every amount has a declared base unit, integer bound, and rounding rule. |
@@ -64,7 +64,7 @@ The active configuration is recorded in a signed `components` record. The share 
 
 Governance, valuation, settlement, fee, and custody powers MUST be separate, explicit roles. The configuration names every holder, delegate, recovery source, and rotation authority.
 
-A replacement MUST be signed and anchored before activation. It names the current configuration, advances generation and nonce once, passes its declared checks, and performs only its declared migration. It MUST preserve every share and user right, carry forward the fee high-water mark, and MUST NOT raise the performance-fee rate for the epoch then awaiting settlement; activation declares the checks that prove both. Failure leaves the prior configuration active.
+A replacement MUST be signed and anchored before activation. It names the current configuration, advances generation and nonce by one, passes its declared checks, and performs only its declared migration. It MUST preserve every share and user right, carry forward the fee high-water mark, and MUST NOT raise the performance-fee rate for the epoch then awaiting settlement; activation declares the checks that prove these guarantees. Failure leaves the prior configuration active.
 
 An anchor change also moves the latest record checkpoints in the same transaction. The [EVM annex](./pmvs-evm.md#configuration-activation) defines the exact activation and migration calls.
 
@@ -110,7 +110,7 @@ Full-system levels are cumulative:
 
 | Level | What is proved |
 |---|---|
-| L1 | Complete custody, inventory, inputs, price evidence, settlement, reserves, and receipt agree. |
+| L1 | Custody, inventory, and inputs are complete; price evidence, settlement, reserves, and receipts agree with them. |
 | L2 | L1 plus deterministic replay reproduces NAV, price, fees, and settlement. |
 | L3 | L2 plus every required reporting slot has a valuation or explicit gap. |
 

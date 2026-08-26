@@ -34,7 +34,7 @@ flowchart TB
 
 ## Record order
 
-Initialization binds the anchor to one vault and one authority resolver. The resolver is the contract that returns the authorized signer and any required settlement wrapper. The first vault record is its components record at sequence `0`. Each later vault record names the prior hash and uses the next sequence.
+Initialization binds the anchor to one vault, called the subject, and one authority resolver. The resolver is the contract that returns the authorized signer and any required settlement wrapper. The first vault record is its components record at sequence `0`. Each later vault record names the prior hash and uses the next sequence.
 
 Watchers are independent observers. They have separate signer-derived streams and cannot advance the vault's own record history. A successful commit checks the canonical digest and current authority, stores the new head, and emits the anchor event. Any failure reverts every effect.
 

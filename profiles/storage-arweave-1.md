@@ -27,7 +27,7 @@ flowchart LR
     class R fail;
 ```
 
-An Arweave transaction id is `SHA-256(signature)`. It identifies an upload, not the PMVS record hash. The same record bytes may be uploaded again under another transaction id without changing their PMVS hash.
+An Arweave transaction id is the Base64URL encoding of `SHA-256(signature)`. It identifies an upload, not the PMVS record hash. The same record bytes may be uploaded again under another transaction id without changing their PMVS hash.
 
 Publication MUST:
 

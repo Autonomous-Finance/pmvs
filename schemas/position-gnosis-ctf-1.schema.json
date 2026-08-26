@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.4/schemas/position-gnosis-ctf-1.schema.json",
+  "$id": "https://raw.githubusercontent.com/Autonomous-Finance/pmvs/v0.1.0-rc.5/schemas/position-gnosis-ctf-1.schema.json",
   "title": "PMVS Gnosis CTF position profile v1",
   "description": "Machine shape for one Gnosis CTF position, from condition and collateral through token identity and pinned custody balance.",
   "type": "object",

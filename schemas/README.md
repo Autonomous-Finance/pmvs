@@ -4,7 +4,7 @@ This is implementer and verifier reference material. Most readers should start w
 
 These machine-readable schemas support those Parts and the selected profiles. The [EVM annex](../pmvs-evm.md) defines hashes, calls, and events; the [standards map](../standards-map.md) records their design sources.
 
-Schema validation checks shape, not truth. Passing a validator is not conformance. Some `$comment` annotations in these files are normative: uniqueness, sorting, and completeness rules the PMVS verifier enforces even though a JSON-Schema validator ignores them. The [record-kind numbers](../pmvs-evm.md#common-encoding) live in the annex, not here. Semantic and evidence checks follow in the order below.
+Schema validation checks shape, not truth. Passing a validator is not conformance. `$comment` annotations that state requirement rules (uniqueness, sorting, completeness, bounds) are normative for the PMVS verifier, even though JSON-Schema validators ignore `$comment`. The [record-kind numbers](../pmvs-evm.md#common-encoding) live in the annex, not here. Semantic and evidence checks follow in the order below.
 
 | File | Purpose |
 |---|---|
@@ -12,7 +12,7 @@ Schema validation checks shape, not truth. Passing a validator is not conformanc
 | [`position-gnosis-ctf-1.schema.json`](./position-gnosis-ctf-1.schema.json) | `position/gnosis-ctf/1` positions |
 | [`venue-polymarket-1.schema.json`](./venue-polymarket-1.schema.json) | `venue/polymarket/1` venue state |
 
-The files use [JSON Schema 2020-12](https://json-schema.org/draft/2020-12). Their `$id` values pin tag `v0.1.0-rc.4`. Register each file by `$id` before resolving references.
+The files use [JSON Schema 2020-12](https://json-schema.org/draft/2020-12). Their `$id` values pin tag `v0.1.0-rc.5`. Register each file by `$id` before resolving references.
 
 ## Validation order
 

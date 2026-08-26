@@ -19,9 +19,18 @@ Contents: [Common encoding](#common-encoding), [Interface registry](#interface-r
 
 This annex defines the exact EVM wire format and settlement mechanics. Implementations and verifiers MUST use the types, field order, hashes, calls, and events below. The [schemas](./schemas/README.md) define record shapes.
 
-**Compatibility note.** This is the v1 target wire format. The first Zeit reference deployment predates it: its settlement inputs carry a `dataURI` string this annex drops, its Merkle leaves are undomained 92-byte packed fields, and its zero-NAV roll permanently retires instead of winddown-and-restart. Those deployments conform to an earlier iteration, not this annex; a migration path is future work.
+**Compatibility note.** This is the v1 target wire format. The authors' first production deployment, Zeit, predates it: its settlement inputs carry a `dataURI` string this annex drops, its Merkle leaves are undomained 92-byte packed fields, and its zero-NAV roll permanently retires instead of winddown-and-restart. Those deployments follow an earlier wire format, not this annex; a migration path is future work.
 
 ## Common encoding
+
+Four identifiers recur across the Parts. Their roles are:
+
+| Identifier | Role |
+|---|---|
+| `pmvs-m1` | The valuation method the components record names. |
+| `backend/settlement/1` | The price-publication boundary between backend and vault. |
+| `settlement/epoch-merkle/1` | The queued-settlement profile; its parameters live under `profileParameters`. |
+| `pmvs-merkle/1` | The Merkle tree encoding that profile uses for claims. |
 
 The vault subject is the share token on one chain:
 
@@ -35,7 +44,7 @@ PMVS-JCS/1 produces canonical UTF-8 record bytes. The record hash is:
 recordHash = keccak256(UTF8(PMVS-JCS(record)))
 ```
 
-PMVS-JCS/1 tightens [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785). It forbids JSON numbers, insignificant whitespace, a BOM, invalid Unicode, duplicate keys, sparse arrays, and noncanonical address or hash casing. Integers use bounded decimal strings; object keys use UTF-16 order.
+PMVS-JCS/1 is [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) serialization with stricter acceptance rules: it rejects JSON numbers, BOMs, invalid Unicode, duplicate keys, sparse arrays, and noncanonical address or hash casing. Integers are bounded decimal strings; object keys follow RFC 8785's UTF-16 order.
 
 Subject attestations use [EIP-712](https://eips.ethereum.org/EIPS/eip-712) with name `PMVS-Attestation`, version `1`, the subject chain id, and the active anchor as verifying contract. The exact primary type is:
 
@@ -43,11 +52,11 @@ Subject attestations use [EIP-712](https://eips.ethereum.org/EIPS/eip-712) with 
 Attestation(bytes32 recordHash,uint8 kind,bytes32 subjectId,bytes32 streamId,uint64 sequence,bytes32 prev,bytes32 previousAnchor)
 ```
 
-EOA signatures MUST satisfy [EIP-2](https://eips.ethereum.org/EIPS/eip-2) low-`s` rules. Contract signatures MUST return [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) magic value `0x1626ba7e` for this digest.
+EOA signatures MUST satisfy [EIP-2](https://eips.ethereum.org/EIPS/eip-2) low-`s` rules. Contract signatures MUST return [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) magic value `0x1626ba7e` for this digest. On the wire, `signatureScheme` is `0` for `eip712-ecdsa`, a 65-byte `r || s || v` signature, and `1` for `eip712-erc1271`, whose bytes pass unchanged to `isValidSignature`.
 
 ### Record kinds
 
-Every record kind has one permanent number. The number is the `kind` in attestations, authority lookups, heads, and anchor events. The envelope schema names kinds by string, except watcher heads inside migrations, which carry the number directly.
+Every record kind has one permanent number. The number is the `kind` in attestations, authority lookups, heads, and anchor events. The envelope schema names kinds by string, except watcher heads inside migrations, which carry the decimal number as a string ("10").
 
 | Number | Record kind | String name |
 |---|---|---|
@@ -232,7 +241,7 @@ Target, calldata, and expected return-data hash MUST also match. Transition call
 PMVSRecordAnchored(subjectId:bytes32,streamId:bytes32,recordHash:bytes32,sequence:uint64,kind:uint8,recordPrev:bytes32,previousAnchor:bytes32,signer:address,signatureScheme:uint8,signatureHash:bytes32,uri:string) i(0,1,2)
 ```
 
-The event stores `signatureHash = keccak256(signature)`. Watcher streams use:
+The event stores `signatureHash = keccak256(signature)`. The first record of a stream uses zero `recordPrev`; a record committed under the subject's first anchor uses zero `previousAnchor`. Watcher streams use:
 
 ```text
 streamId = keccak256(abi.encodePacked("PMVS:WATCHER:1", signer))
@@ -301,7 +310,7 @@ pps = floor(nav * 10^shareDecimals * 10^18
             / (totalSupply * 10^assetDecimals))
 ```
 
-Cash includes every controlled accounting-asset balance, including escrow and reserves. Overlay lines are out of scope in v1: any nonzero overlay line fails valuation (`UNVERIFIABLE_INPUTS`). Asset-denominated escrow, funded withdrawals, asset fee claims, debt, and operating obligations are liabilities. Share-denominated claims remain in supply and MUST NOT reduce NAV again. Internal transfers do not change NAV. Positive supply with zero NAV gives zero PPS; such an epoch settles as zero NAV until NAV recovers above one unit of PPS precision. Zero supply uses `initialPps`. Unexplained assets with zero supply return `UNALLOCATED_ASSETS`. `referencePps` is display-only and MUST NOT settle requests. Arithmetic uses bounded integers and exact decimal parsing, never IEEE-754.
+Cash includes every controlled accounting-asset balance, including escrow and reserves. Overlay lines, operator-declared value adjustments outside cash, positions, and liabilities, are out of scope in v1: any nonzero overlay line fails valuation (`UNVERIFIABLE_INPUTS`). Asset-denominated escrow, funded withdrawals, asset fee claims, debt, and operating obligations are liabilities. Share-denominated claims remain in supply and MUST NOT reduce NAV again. Internal transfers do not change NAV. Positive supply with zero NAV gives zero PPS; such an epoch settles as zero NAV until NAV recovers above one unit of PPS precision. Zero supply uses `initialPps`. Unexplained assets with zero supply return `UNALLOCATED_ASSETS`. `referencePps` is display-only and MUST NOT settle requests. Arithmetic uses bounded integers and exact decimal parsing, never IEEE-754.
 
 Positions sort by numeric chain id, contract, and numeric token id. Holdings sort by account, accounting lines by UTF-16 `id`, and bids by descending price. Settlement records use an epoch and null slot. Periodic records use a slot and null epoch; missing periodic observations use gap records.
 
@@ -319,11 +328,13 @@ Selection commits to the ordered ids:
 selectionHash = keccak256(abi.encode(requestIds))
 ```
 
-Delegated withdrawals use EIP-712 domain `PMVS-WithdrawIntent`, version `1`, and this primary type:
+Delegated withdrawals use the two-field domain `EIP712Domain(string name,string version)` with name `PMVS-WithdrawIntent` and version `1`, and this primary type:
 
 ```text
 WithdrawIntent(address investor,uint256 shares,uint256 nonce,uint256 deadline,uint256 chainId,address settlementContract)
 ```
+
+The message's `chainId` and `settlementContract` MUST match the executing chain and settlement contract. The nonce is tracked per investor, MUST equal the investor's current nonce, and is consumed exactly once. An intent is valid while `block.timestamp <= deadline`.
 
 The settlement types and field order are exact:
 
@@ -342,6 +353,7 @@ requestWithdraw(uint256)->uint256; requestWithdrawFor(address,uint256,uint256,ui
 cancelDeposit(uint256)->uint256; cancelWithdraw(uint256)->uint256;
 depositQueuedAt(uint256)->uint64; withdrawQueuedAt(uint256)->uint64; withdrawAssetsDue(uint256)->uint256;
 maxPendingDuration()->uint64; claimRemedyDelay()->uint64;
+sunsetting()->bool; requestsPaused()->bool;
 refundExpiredDeposit(uint256)->uint256; refundExpiredWithdraw(uint256)->uint256;
 deliverExpiredDeposit(uint256)->uint256; deliverExpiredWithdraw(uint256)->uint256;
 currentEpoch()->uint64; lastProcessedEpoch()->uint64; advanceEpoch(uint64)->(bool,uint64);
@@ -350,7 +362,8 @@ rollEpochZeroNav(uint64,uint64)->(bool,uint64);
 claimDeposits(DepositClaim[])->uint256; claimWithdrawals(WithdrawClaim[])->uint256;
 epochFinalPps(uint64)->uint256; depositLeafCount(uint64)->uint256; withdrawLeafCount(uint64)->uint256;
 epochArchiveHash(uint64)->bytes32; epochActionRecordHash(uint64)->bytes32; retirementFinalRecordHash()->bytes32;
-ROLL_SETTLEMENT_VERSION()->uint64; pmvsRetirementState()->(uint256,uint256,uint256,uint256);
+ROLL_SETTLEMENT_VERSION()->uint64;
+pmvsRetirementState()->(uint256 shareSupply,uint256 pendingRequests,uint256 outstandingClaims,uint256 claimFunding);
 supportsFinalRoll()->bool; finalRollReady()->bool;
 rollEpochWithAnchor(uint64,uint64,DepositSettlementInput,WithdrawSettlementInput,PMVSAnchorInput,bytes)->(bool,uint64);
 rollEpochZeroNavWithAnchor(uint64,uint64,PMVSAnchorInput,bytes)->(bool,uint64);
@@ -466,7 +479,7 @@ claimDeadline   = checkedAdd(validUntil, claimRemedyDelay)
 
 After the relevant deadline, anyone may refund an unselected input or deliver a stored output. Normal ownership, reserve, replay, event, and reentrancy checks still apply. Operator-dependent mode omits both parameters, returns zero from both getters, and reverts the remedy calls.
 
-`sunsetting` stops new deposits but permits withdrawals. `requestsPaused` stops both request types. Neither condition may block cancellation, a funded claim, or a bounded deadline remedy.
+`sunsetting` stops new deposits but permits withdrawals. `requestsPaused` stops both request types. The declared operator or governance role sets both flags, and the getters above expose them. Neither condition may block cancellation, a funded claim, or a bounded deadline remedy.
 
 ### Zero NAV, final withdrawal, and retirement
 
@@ -485,7 +498,7 @@ feeAssets        = floor(S * (grossPps - ppsFinal) / K)
 userAssets       = freeBefore - feeAssets
 ```
 
-Require `sourceAssets >= encumberedBefore`, `freeBefore >= quotedUserAssets + feeAssets`, and `userAssets + feeAssets == freeBefore`. For sorted ids, let `P[0] = 0` and `P[i] = P[i-1] + storedShares(id[i])`. Store:
+Require `sourceAssets >= encumberedBefore`, `freeBefore >= quotedUserAssets + feeAssets`, and `userAssets + feeAssets == freeBefore`. For the `n` sorted ids `id[1..n]`, let `P[0] = 0` and `P[i] = P[i-1] + storedShares(id[i])` for `i = 1..n`. Store:
 
 ```text
 assets[i] = floor(P[i] * userAssets / S) - floor(P[i-1] * userAssets / S)
@@ -493,7 +506,7 @@ assets[i] = floor(P[i] * userAssets / S) - floor(P[i-1] * userAssets / S)
 
 Require `P[n] == S` and `sum(assets[i]) == userAssets`. Claims and deadline delivery use the stored amount.
 
-Retirement requires zero supply, pending requests, outstanding claims, claim funding, positions, liabilities, and unresolved recovery rights. The atomic wrapper checks the four onchain counters before and after committing `retirement-final`, sets the subject-finalized and retired flags, stores its hash and sequence, and emits `RetirementFinalRecordBound` and `VaultRetired`. It MUST NOT call tokens, arbitrary targets, hooks, or `delegatecall`. Other retirement paths revert. Registry mode must migrate to atomic mode first. A failed transaction leaves the vault Active.
+Retirement requires zero supply, pending requests, outstanding claims, claim funding, positions, liabilities, and unresolved recovery rights. The atomic wrapper checks the four `pmvsRetirementState` counters before and after committing `retirement-final`, sets the subject-finalized and retired flags, stores its hash and sequence, and emits `RetirementFinalRecordBound` and `VaultRetired`. It MUST NOT call tokens, arbitrary targets, hooks, or `delegatecall`. Other retirement paths revert. Registry mode must migrate to atomic mode first. A failed transaction leaves the vault Active.
 
 ## Merkle claims
 
@@ -581,7 +594,7 @@ The signature MUST match `profiles.anchorMode`. The hash excludes `PMVSAnchorInp
 
 ## Verification result codes
 
-Verifiers SHOULD return every independent failure. Required codes are:
+A verifier MUST use these identifiers for the failures it reports and SHOULD report every failure it can establish without assuming the validity of another failed dependency:
 
 ```text
 INVALID_ENCODING,INVALID_HASH,INVALID_SIGNATURE,UNVERIFIABLE_AUTHORITY,

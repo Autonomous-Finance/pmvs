@@ -4,11 +4,11 @@ Who maintains this standard and how it changes. Short on purpose.
 
 ## Maintainers
 
-The authors listed in each document maintain the suite in the [Autonomous-Finance/pmvs](https://github.com/Autonomous-Finance/pmvs) repository. Substantive changes go through pull request; every change lands with a release tag.
+The authors listed in each document maintain the suite in the [Autonomous-Finance/pmvs](https://github.com/Autonomous-Finance/pmvs) repository. Substantive changes go through pull request. Maintainers publish releases under immutable tags; `main` may run ahead of the latest tag, and a conformance claim MUST name a tag or commit.
 
 ## Identifiers
 
-Profile, method, and interface ids are minted only in this repository. An id names exactly one governing document at one version. A third party extending or forking a profile MUST use its own prefix (`venue/example/1`, not `venue/polymarket/1`) so records stay distinguishable. Colliding or shadow ids are rejected as `UNSUPPORTED_PROFILE`.
+Profile and method ids are allocated only in this repository; ERC-165 interface ids derive from the ABI and are not part of this registry. An id names exactly one governing document at one version. A third party extending or forking a profile MUST use its own prefix (`venue/example/1`, not `venue/polymarket/1`) so records stay distinguishable. Colliding or shadow ids are rejected as `UNSUPPORTED_PROFILE`.
 
 ## Stale venue facts
 

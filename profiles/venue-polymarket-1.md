@@ -27,7 +27,7 @@ flowchart TB
 
 ## 1. Discover every holding
 
-The active configuration lists every strategy account as `strategy-custody`. That set MUST equal `custodyConfigs`, including empty and pUSD-only accounts. Reconstruct every ERC-1155 token that touched them, then read its pinned balance.
+The active configuration lists every strategy account as `strategy-custody`. That set MUST equal the record's `custodyConfigs` list, including empty and pUSD-only accounts. Reconstruct every ERC-1155 token that touched them, then read its pinned balance.
 
 Every supported nonzero CTF balance is a vault asset, including an unsolicited token. An approval is not ownership. A nonzero PositionManager or Combo balance returns `UNSUPPORTED_POSITION_FORMAT`; unknown tokens follow Core's fail-closed rule.
 
@@ -38,7 +38,7 @@ Polymarket uses CTF. Recompute each condition, collection, position, and CLOB as
 | Market type | Raw collateral | Resolution path |
 |---|---|---|
 | Standard | USDC.e | UMA CTF adapter |
-| Negative risk | WCOL (Polymarket's wrapped-collateral token, redeemable 1:1 for USDC.e) backed by USDC.e | NegRisk adapter |
+| Negative risk | WCOL (Polymarket's wrapped-collateral token; unwrapping returns USDC.e at par while the wrapper's reserves cover this vault's route exposure, which step 4 checks) | NegRisk adapter |
 
 Both routes end in pUSD, the vault's accounting and exchange asset. pUSD is not part of the CTF position id. The [venue schema](../schemas/venue-polymarket-1.schema.json) pins the exact Polygon addresses, code hashes, adapters, exchanges, factories, and profile constants.
 
@@ -46,7 +46,7 @@ Negative-risk questions MUST match their market, index, question count, operator
 
 ## 3. Use the book or the payout
 
-An unresolved position uses the captured [`GET /book?token_id={assetId}`](https://docs.polymarket.com/api-reference/market-data/get-order-book) response. Preserve the exact bytes and decimal text. Parse six-decimal integers without floating point, merge equal bid prices, sort bids downward, and keep enough depth to cover the held size.
+An unresolved position uses the captured [`GET /book?token_id={assetId}`](https://docs.polymarket.com/api-reference/market-data/get-order-book) response. Preserve the exact bytes and decimal text. Parse six-decimal integers without floating point, merge equal bid prices, sort bids downward, and keep at least enough depth to cover the held size when the book offers it; a shallower complete book leaves a remainder bounded by M1's unfilled-exposure caps.
 
 ```text
 PRICE_SCALE   = 1_000_000
@@ -54,7 +54,7 @@ venueExitCost = floor(grossMark * maxFeeRateBps / 10_000)
 mark          = grossMark - venueExitCost
 ```
 
-For an unresolved book, `maxFeeRateBps` MUST be between `1` and `9,999`. A zero getter result does not prove zero fees. Missing, stale, invalid, or non-positive book data returns `DATA_UNAVAILABLE`.
+For an unresolved book, `maxFeeRateBps` MUST be between `1` and `9,999`. A zero getter result does not prove zero fees. Missing, stale, or invalid book data returns `DATA_UNAVAILABLE`; a valid empty bid array counts only under M1's repeated-empty-book rule.
 
 A position is resolved only when the CTF payout denominator is positive and the numerators sum to it. Resolved positions use the onchain payout and have no book. One condition MUST have the same payout across all custody accounts.
 
@@ -65,7 +65,7 @@ This profile recognizes two custody types:
 | Custody | Use in v1 |
 |---|---|
 | Deposit Wallet v2 | Evidence and diagnostics only |
-| Legacy Gnosis Safe | Settlement-eligible after every profile check |
+| Legacy Gnosis Safe | Settlement-eligible after every profile check; v1 settlement from Safe custody stays diagnostic for L1 (step 5) |
 
 For a legacy Safe, reproduce Polymarket's [PolySafeLib CREATE2 derivation](https://github.com/Polymarket/ctf-exchange-v2/blob/ccc0596074f4dfd62c944fbca4de252893b82b4b/src/exchange/libraries/PolySafeLib.sol). Require pinned code, complete owners and threshold, unique derivation signers, no modules, and no guard or fallback handler. The [EVM annex](../pmvs-evm.md#polymarket-settlement-call-plan) and schema contain exact constants.
 
@@ -82,7 +82,7 @@ Pin every call, recipient, approval, minimum output, and pre-call swept balance.
 
 Polymarket V2 orders have no signed expiry or cancellation nonce. API cancellation alone cannot prove that an order can no longer fill. `orderCommitments` records disclosed orders but cannot prove completeness.
 
-Before settlement, one direct helper contract, called the enforcer, MUST confirm the effective user pause for every custody account on both V2 exchanges. This stops venue fills. Claims and fees use separate, prefunded vault accounts outside strategy custody. That settlement transaction MUST NOT execute from strategy custody, change Safe controls or nonce, or mutate an exchange. The receipt proves the pause checks, call trace, and funding deltas.
+Before settlement, one direct helper contract, called the enforcer, MUST confirm the effective user pause for every custody account on both V2 exchanges. This stops venue fills. Claims and fees use separate, prefunded vault accounts outside strategy custody. That settlement transaction MUST NOT execute from strategy custody, change Safe controls or nonce, or mutate an exchange. The receipt record proves the pause checks, the executed call plan, and the funding deltas.
 
 The pause does not stop a Safe owner from moving assets after capture. Version 1 detects that race after execution but cannot prevent it. Production needs onchain balance and control checks before settlement effects. A freeze row may also carry the predicate `transfer-authorities-revoked`; in v1 it is diagnostic only, because pUSD is upgradeable and revoked authorities alone do not prove a safe freeze.
 
@@ -101,7 +101,7 @@ The fixed facts were checked at Polygon block `92410552`, hash `0x44bf2575488cbe
 - [Gnosis CTF at `eeefca6`](https://github.com/gnosis/conditional-tokens-contracts/blob/eeefca66eb46c800a9aaab88db2064a99026fde5/contracts/ConditionalTokens.sol), [NegRisk adapter at `f78b35b`](https://github.com/Polymarket/neg-risk-ctf-adapter/blob/f78b35b0863b4308a431ca307d06f49b2ea65e78/src/NegRiskAdapter.sol), and [UMA CTF Adapter v4](https://github.com/Polymarket/uma-ctf-adapter/blob/8b76cc9e0d46c6f7450a0adb0ddc0f5b0568c9cc/src/UmaCtfAdapter.sol)
 - [Deposit Wallet implementation](https://polygon.blockscout.com/address/0xf7f27c29e60fe6325bef8da7f93250353d2e3294?tab=contract)
 
-Public API access does not permit response republication.
+Public API access does not permit response republication. A deployment MUST therefore document a retrieval route that lets a verifier obtain the byte-identical captures lawfully; if none exists, M1 verification returns `DATA_UNAVAILABLE`.
 
 ## Copyright
 

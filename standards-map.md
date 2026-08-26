@@ -8,11 +8,11 @@ This map records design sources and boundaries. `Adopted` means exact use; `adap
 |---|---|---|
 | [Boring Vault architecture](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/README.md) and [Accountant](https://github.com/Veda-Labs/boring-vault/blob/39f9d3144fd0416fdcb467ecec916b31457c915d/src/base/Roles/AccountantWithRateProviders.sol) | Adapted | Share, accounting, and control separation; offchain rate and high-water mark. PMVS changes contracts, evidence, and fee math. |
 | [ERC-20](https://eips.ethereum.org/EIPS/eip-20) | Adopted | Share interface, not backing, NAV, or settlement. |
-| [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) | Adapted | Asset/share units, conversion, and rounding. Full interface and behavior are required for conformance. |
+| [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) | Adapted | Asset/share units, conversion, and rounding. Claiming ERC-4626 itself requires its full interface and behavior. |
 | [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540#request-lifecycle) | Adapted | Pending, claimable, claimed, and pull claim. PMVS adds epochs, remedies, evidence, Merkle allocation, and a custom ABI. |
 | [Uniswap MerkleDistributor](https://github.com/Uniswap/merkle-distributor/blob/25a79e8ec8c22076a735b1a675b961c8184e7931/contracts/MerkleDistributor.sol) | Adapted | Root, proof, replay guard, and pull transfer. PMVS changes leaf, root, and reserves. |
 | [Solmate MerkleProofLib](https://github.com/transmissions11/solmate/blob/eaa7041378f9a6c12f943de08a6c41b31a9870fc/src/utils/MerkleProofLib.sol), [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962.html#section-2.1), [OpenZeppelin MerkleProof](https://docs.openzeppelin.com/contracts/5.x/api/utils/cryptography#MerkleProof) | Adapted | Sorted pairs, domain prefixes, and proof rules. The PMVS formula controls. |
-| [EIP-712](https://eips.ethereum.org/EIPS/eip-712), [EIP-2](https://eips.ethereum.org/EIPS/eip-2), [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) | Adopted | Digests, low-`s` ECDSA, and contract signatures. PMVS adds authority and replay. |
+| [EIP-712](https://eips.ethereum.org/EIPS/eip-712), [EIP-2](https://eips.ethereum.org/EIPS/eip-2), [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) | Adopted | Digests, low-`s` ECDSA, and contract signatures. PMVS adds authority and replay; the low-`s` bound extends EIP-2's transaction rule to attestation signatures. |
 | [ERC-165](https://eips.ethereum.org/EIPS/eip-165) | Adopted | Interface detection, not behavior. |
 | [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) | Adapted | Canonical JSON. PMVS-JCS adds types, bounds, casing, and array order. |
 | [JSON Schema 2020-12](https://json-schema.org/draft/2020-12) | Adopted | Record shapes; semantic checks stay separate. |
@@ -41,7 +41,7 @@ ERC-7540 also requires its request, claim, operator, preview, and event behavior
 
 ## Status
 
-PMVS is a pre-EIP suite under [EIP-1](https://eips.ethereum.org/EIPS/eip-1). ERC-8113 series accounting conflicts with Core v1's single NAV basis and needs a new Core version.
+PMVS is an independent pre-EIP draft written to [EIP-1](https://eips.ethereum.org/EIPS/eip-1) conventions; it has no EIP number or status. ERC-8113 series accounting conflicts with Core v1's single NAV basis and needs a new Core version.
 
 Reserved: `PMVS-CHALLENGE` names future work on challenges, bonds, and recourse: mechanisms that act before settlement instead of only proving wrongdoing after it. Nothing in v1 implements it.
 
