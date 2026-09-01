@@ -98,10 +98,13 @@ Most readers can stop there. A deployment then selects only the profiles it uses
 - [Polymarket on Polygon](./profiles/venue-polymarket-1.md)
 - [EVM record anchoring](./profiles/anchor-evm-1.md)
 - [Arweave record storage](./profiles/storage-arweave-1.md)
+- [Instant cash-only settlement](./profiles/settlement-instant-cash-1.md)
 
 Contract implementers and verifier authors use the [EVM implementation annex](./pmvs-evm.md) for exact hashes, structs, calls, selectors, formulas, and events. The [schemas](./schemas/README.md) define machine-readable records. These annexes are reference material, not the introductory reading path.
 
 The [standards and design lineage map](./standards-map.md) says what PMVS adopts, adapts, depends on, or cites as related work. How the standard is maintained and how profile ids are governed: [GOVERNANCE.md](./GOVERNANCE.md).
+
+Which vaults implement PMVS today, how far, and in what order the gaps close: [IMPLEMENTATIONS.md](./IMPLEMENTATIONS.md). A draft ERC that carries the valuation-evidence idea to any vault with offchain-priced assets, as an extension of ERC-8330: [erc/erc-nav-evidence.md](./erc/erc-nav-evidence.md). A complete two-leg roll with fees, for implementers to test against: [fixtures/roll-vector-1.md](./fixtures/roll-vector-1.md).
 
 ## Glossary
 
